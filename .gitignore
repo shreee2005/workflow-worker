@@ -1,0 +1,60 @@
+# Build artifacts
+HELP.md
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+mvnw.cmd
+
+# Node (if accidentally added)
+node_modules/
+package.json
+package-lock.json
+package-lock.yaml
+
+# Gradle
+.gradle/
+gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.factorypath
+
+# STS (Spring Tool Suite)
+.apt_generated
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# Environment
+.env
+.env.local
+.env.*.local
+application-*.properties
+application-*.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
