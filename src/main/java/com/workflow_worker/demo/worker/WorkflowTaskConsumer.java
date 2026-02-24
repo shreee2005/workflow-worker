@@ -1,5 +1,6 @@
 package com.workflow_worker.demo.worker;
 
+import com.workflow_worker.demo.engine.WorkflowStepEngine;
 import com.workflow_worker.demo.entity.Workflow;
 import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class WorkflowTaskConsumer {
 
     private final WorkflowRepository workflowRepository;
+    private final WorkflowStepEngine stepEngine;
     private final WorkflowRunService workflowRunService;
     private final WorkflowRunStepService stepService;
     private final WorkflowMetrics metrics;
@@ -32,13 +34,14 @@ public class WorkflowTaskConsumer {
             WorkflowRepository workflowRepository,
             WorkflowRunService workflowRunService,
             WorkflowRunStepService stepService,
-            StepExecutorRegistry executorRegistry,
+            StepExecutorRegistry executorRegistry, WorkflowStepEngine stepEngine,
             WorkflowMetrics metrics,
             RabbitTemplate rabbitTemplate
     ) {
         this.workflowRepository = workflowRepository;
         this.workflowRunService = workflowRunService;
         this.stepService = stepService;
+        this.stepEngine = stepEngine;
         this.metrics = metrics;
         this.rabbitTemplate = rabbitTemplate;
     }
@@ -57,43 +60,17 @@ public class WorkflowTaskConsumer {
             // duplicate / already finished – do nothing, just exit
             return;
         }
+        try{
+            stepEngine.executeSteps(
+                    runId,
+                    workflowId,
+                    message.getPayload()
+            );
 
-        try {
-            // 2️⃣ Load workflow
-            Workflow wf = workflowRepository.findById(workflowId)
-                    .orElseThrow(() -> new RuntimeException("Workflow not found"));
-
-            // 3️⃣ Parse workflow spec
-            List<StepDefinition> steps = WorkflowSpecParser.parse(wf.getSpec());
-
-            // 4️⃣ Execute steps sequentially
-            for (int i = 0; i < steps.size(); i++) {
-
-                StepDefinition stepDef = steps.get(i);
-
-                WorkflowRunStep step =
-                        stepService.startStep(runId, i, stepDef.getType());
-
-                try {
-                    StepExecutor executor =
-                            StepExecutorRegistry.get(stepDef.getType());
-
-                    executor.execute(stepDef, message.getPayload());
-
-                    stepService.succeedStep(step, "OK");
-
-                } catch (Exception ex) {
-                    stepService.failStep(step, ex.getMessage());
-                    // bubble up to retry/DLQ logic
-                    throw ex;
-                }
-            }
-
-            // 5️⃣ All steps succeeded
             workflowRunService.markSucceeded(runId);
             metrics.runsSucceeded.increment();
-
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
 
             WorkflowRun run = workflowRunService.getRun(runId);
 
