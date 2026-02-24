@@ -11,7 +11,6 @@ public class HttpCallStepExecutor implements StepExecutor {
     public void execute(StepDefinition step, String payload) {
         String url = (String) step.getConfig().get("url");
         System.out.println("[HTTP CALL] Calling " + url);
-        // real HTTP later
     }
 }
 
