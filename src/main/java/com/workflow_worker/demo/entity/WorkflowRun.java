@@ -62,8 +62,10 @@ public class WorkflowRun{
     }
 
     public enum Status {
+        CREATED,
         QUEUED,
         RUNNING,
+        RETRYING,
         SUCCEEDED,
         FAILED
     }
