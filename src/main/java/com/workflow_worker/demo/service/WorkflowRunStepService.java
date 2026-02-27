@@ -5,6 +5,8 @@ import com.workflow_worker.demo.repository.WorkflowRunStepRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,4 +42,41 @@ public class WorkflowRunStepService {
         step.setErrorMessage(error);
         repo.save(step);
     }
+
+    private void transition(
+            WorkflowRunStep step,
+            WorkflowRunStep.Status target
+    ) {
+
+        WorkflowRunStep.Status current = step.getStatus();
+
+        if (!ALLOWED_TRANSITIONS
+                .getOrDefault(current, Set.of())
+                .contains(target)) {
+
+            throw new IllegalStateException(
+                    "Invalid step transition: " + current + " → " + target
+            );
+        }
+
+        step.setStatus(target);
+    }
+
+    private static final Map<WorkflowRunStep.Status, Set<WorkflowRunStep.Status>> ALLOWED_TRANSITIONS =
+            Map.of(
+                    WorkflowRunStep.Status.PENDING,
+                    Set.of(WorkflowRunStep.Status.RUNNING),
+
+                    WorkflowRunStep.Status.RUNNING,
+                    Set.of(
+                            WorkflowRunStep.Status.SUCCEEDED,
+                            WorkflowRunStep.Status.FAILED
+                    ),
+
+                    WorkflowRunStep.Status.SUCCEEDED,
+                    Set.of(),
+
+                    WorkflowRunStep.Status.FAILED,
+                    Set.of()
+            );
 }

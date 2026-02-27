@@ -38,10 +38,8 @@ public class WorkflowRunStep {
     private String errorMessage;
 
     public enum Status {
-        CREATED,
-        QUEUED,
+        PENDING,
         RUNNING,
-        RETRYING,
         SUCCEEDED,
         FAILED
     }
