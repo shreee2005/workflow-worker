@@ -40,7 +40,7 @@ public class RetryService {
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
-            workflowRunService.markQueuedForRetry(runId);
+            workflowRunService.transition(runId , WorkflowRun.Status.RETRYING);
 
             metrics.runsRetried.increment();
 
@@ -54,7 +54,7 @@ public class RetryService {
             return;
         }
 
-        workflowRunService.markFailed(runId, ex.getMessage());
+        workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
         metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
 
