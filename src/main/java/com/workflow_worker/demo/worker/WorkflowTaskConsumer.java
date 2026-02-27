@@ -2,6 +2,7 @@ package com.workflow_worker.demo.worker;
 import com.workflow_worker.demo.engine.WorkflowStepEngine;
 import com.workflow_worker.demo.engine.lock.DistributedLockService;
 import com.workflow_worker.demo.engine.retry.RetryService;
+import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.executers.StepExecutorRegistry;
 import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.repository.WorkflowRepository;
@@ -48,7 +49,7 @@ public class WorkflowTaskConsumer {
         }
 
         try {
-            workflowRunService.markRunning(runId);
+            workflowRunService.transition(runId , WorkflowRun.Status.RUNNING);
             metrics.runsStarted.increment();
         } catch (IllegalStateException e) {
             return;
@@ -60,7 +61,7 @@ public class WorkflowTaskConsumer {
                     message.getPayload()
             );
 
-            workflowRunService.markSucceeded(runId);
+            workflowRunService.transition(runId , WorkflowRun.Status.SUCCEEDED);
             metrics.runsSucceeded.increment();
         }
         catch (Exception ex) {

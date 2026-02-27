@@ -23,8 +23,7 @@ public class WorkflowRunService {
     }
 
     public boolean canRetry(WorkflowRun run) {
-        return (run.getStatus() == WorkflowRun.Status.RUNNING
-                || run.getStatus() == WorkflowRun.Status.QUEUED)
+        return run.getStatus() == WorkflowRun.Status.RUNNING
                 && run.getAttempt() < run.getMaxAttempts();
     }
 
