@@ -49,7 +49,8 @@ public class RetryService {
             retryMsg.setPayload((String) payload);
             retryMsg.setAttempt(run.getAttempt());
 
-            rabbitTemplate.convertAndSend("workflow.tasks", retryMsg);
+            String retryQueue = resolveRetryQueue(run.getAttempt());
+            rabbitTemplate.convertAndSend(retryQueue,retryMsg);
             return;
         }
 
@@ -65,5 +66,14 @@ public class RetryService {
         dlqMsg.setFailedAt(OffsetDateTime.now());
 
         rabbitTemplate.convertAndSend("workflow.tasks.dlq", dlqMsg);
+    }
+
+    private String resolveRetryQueue(int attempt) {
+        return switch (attempt) {
+            case 1 -> "workflow.retry.5s";
+            case 2 -> "workflow.retry.10s";
+            case 3 -> "workflow.retry.20s";
+            default -> "workflow.retry.40s";
+        };
     }
 }
