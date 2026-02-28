@@ -58,4 +58,40 @@ public class RabbitConfig {
         // durable DLQ, same name as before
         return QueueBuilder.durable("workflow.tasks.dlq").build();
     }
+
+    @Bean
+    public Queue retry5sQueue(){
+        return QueueBuilder.durable("workflow.retry.5s")
+                .withArgument("x-message-ttl" , 5000)
+                .withArgument("x-dead-letter-exchange" , "")
+                .withArgument("x-dead-letter-routing-key" , "workflow.tasks")
+                .build();
+    }
+    @Bean
+    public Queue retry10sQueue() {
+        return QueueBuilder.durable("workflow.retry.10s")
+                .withArgument("x-message-ttl", 10000)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", "workflow.tasks")
+                .build();
+    }
+
+    @Bean
+    public Queue retry20sQueue() {
+        return QueueBuilder.durable("workflow.retry.20s")
+                .withArgument("x-message-ttl", 20000)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", "workflow.tasks")
+                .build();
+    }
+
+    @Bean
+    public Queue retry40sQueue() {
+        return QueueBuilder.durable("workflow.retry.40s")
+                .withArgument("x-message-ttl", 40000)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", "workflow.tasks")
+                .build();
+    }
+
 }
