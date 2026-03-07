@@ -1,40 +1,32 @@
 package com.workflow_worker.demo.engine;
-
 import com.workflow_worker.demo.entity.Workflow;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
-import com.workflow_worker.demo.executers.StepExecutorRegistry;
 import com.workflow_worker.demo.repository.WorkflowRepository;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
-import com.workflow_worker.demo.worker.StepExecutor;
 import com.workflow_worker.demo.workflow.StepDefinition;
 import com.workflow_worker.demo.workflow.WorkflowSpecParser;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.UUID;
 
-@Component
-public class WorkflowStepEngine {
-
+public class WorkflowExecutor {
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunStepService stepService;
+    private final StepDispatcher dispatcher;
 
-    public WorkflowStepEngine(
-            WorkflowRepository workflowRepository,
-            WorkflowRunStepService stepService
-    ) {
+    public WorkflowExecutor(WorkflowRepository workflowRepository, WorkflowRunStepService stepService, StepDispatcher dispatcher) {
         this.workflowRepository = workflowRepository;
         this.stepService = stepService;
+
+        this.dispatcher = dispatcher;
     }
 
-    public void executeSteps(
+    public void executeRun(
             UUID runId,
             UUID workflowId,
-            Object payload
-    ) throws Exception {
-
+            String payload
+    ) throws Exception{
         Workflow wf = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new RuntimeException("Workflow not found"));
+                .orElseThrow(() -> new RuntimeException("Workflow Not Found"));
 
         List<StepDefinition> steps =
                 WorkflowSpecParser.parse(wf.getSpec());
@@ -46,20 +38,18 @@ public class WorkflowStepEngine {
             WorkflowRunStep step =
                     stepService.startStep(runId, i, stepDef.getType());
 
-            try {
-                StepExecutor executor =
-                        StepExecutorRegistry.get(stepDef.getType());
+            StepExecutionResult result =
+                    dispatcher.dispatch(stepDef, payload);
 
-                System.out.println("Executing step: " + stepDef.getType());
+            if (result.getStatus() == StepExecutionResult.Status.SUCCESS) {
 
-                executor.execute(stepDef, (String) payload);
+                stepService.succeedStep(step, result.getOutput());
 
-                stepService.succeedStep(step, "OK");
+            } else {
 
-            } catch (Exception ex) {
-                System.out.println("STEP FAILED: " + ex.getMessage());
-                stepService.failStep(step, ex.getMessage());
-                throw ex;
+                stepService.failStep(step, result.getError());
+
+                throw new RuntimeException(result.getError());
             }
         }
     }
