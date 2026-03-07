@@ -1,6 +1,6 @@
 package com.workflow_worker.demo.worker;
 
-import com.workflow_worker.demo.engine.WorkflowStepEngine;
+import com.workflow_worker.demo.engine.WorkflowExecutor;
 import com.workflow_worker.demo.engine.lock.DistributedLockService;
 import com.workflow_worker.demo.engine.retry.RetryService;
 import com.workflow_worker.demo.entity.WorkflowRun;
@@ -8,6 +8,7 @@ import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.service.WorkflowRunService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
 import java.util.UUID;
 
 @Component
@@ -15,7 +16,7 @@ public class WorkflowTaskConsumer {
 
     private final DistributedLockService distributedLockService;
     private final RetryService retryService;
-    private final WorkflowStepEngine stepEngine;
+    private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunService workflowRunService;
     private final WorkflowMetrics metrics;
 
@@ -23,13 +24,13 @@ public class WorkflowTaskConsumer {
             DistributedLockService distributedLockService,
             WorkflowRunService workflowRunService,
             RetryService retryService,
-            WorkflowStepEngine stepEngine,
+            WorkflowExecutor workflowExecutor,
             WorkflowMetrics metrics
     ) {
         this.distributedLockService = distributedLockService;
         this.workflowRunService = workflowRunService;
         this.retryService = retryService;
-        this.stepEngine = stepEngine;
+        this.workflowExecutor = workflowExecutor;
         this.metrics = metrics;
     }
 
@@ -57,7 +58,7 @@ public class WorkflowTaskConsumer {
                 metrics.runsStarted.increment();
             }
 
-            stepEngine.executeSteps(
+            workflowExecutor.executeRun(
                     runId,
                     workflowId,
                     message.getPayload()
@@ -76,6 +77,7 @@ public class WorkflowTaskConsumer {
             );
 
         } finally {
+
             distributedLockService.release(runId);
         }
     }
