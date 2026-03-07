@@ -5,6 +5,8 @@ import com.workflow_worker.demo.repository.WorkflowRunRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -20,33 +22,8 @@ public class WorkflowRunService {
         return repo.findById(runId).orElseThrow();
     }
 
-    /**
-     * Idempotency gate: only QUEUED → RUNNING is allowed.
-     * Called at the top of the worker.
-     */
-    public void markRunning(UUID runId) {
-        WorkflowRun run = getRun(runId);
-
-        if (run.getStatus() != WorkflowRun.Status.QUEUED) {
-            throw new IllegalStateException(
-                    "Run already processed: " + run.getStatus()
-            );
-        }
-
-        run.setStatus(WorkflowRun.Status.RUNNING);
-        run.setStartedAt(OffsetDateTime.now());
-        repo.save(run);
-    }
-
-    /**
-     * Can this run be retried again?
-     * We allow both RUNNING and QUEUED here so the same run
-     * can be retried after being put back in the queue.
-     */
     public boolean canRetry(WorkflowRun run) {
-        return (run.getStatus() == WorkflowRun.Status.RUNNING
-                || run.getStatus() == WorkflowRun.Status.QUEUED)
-                && run.getAttempt() < run.getMaxAttempts();
+        return run.getAttempt() < run.getMaxAttempts();
     }
 
     public void incrementAttempt(UUID runId) {
@@ -55,43 +32,59 @@ public class WorkflowRunService {
         repo.save(run);
     }
 
-    public void markSucceeded(UUID runId) {
-        WorkflowRun run = getRun(runId);
+    public void transition(UUID runId, WorkflowRun.Status target) {
 
-        if (run.getStatus() != WorkflowRun.Status.RUNNING) {
-            throw new IllegalStateException("Invalid success transition");
+        WorkflowRun run = getRun(runId);
+        WorkflowRun.Status current = run.getStatus();
+
+        if (!ALLOWED_TRANSITIONS
+                .getOrDefault(current, Set.of())
+                .contains(target)) {
+
+            throw new IllegalStateException(
+                    "Invalid Transition " + current + " -> " + target
+            );
         }
 
-        run.setStatus(WorkflowRun.Status.SUCCEEDED);
-        run.setFinishedAt(OffsetDateTime.now());
+        run.setStatus(target);
+
+        if (target == WorkflowRun.Status.RUNNING) {
+            run.setStartedAt(OffsetDateTime.now());
+        }
+
+        if (target == WorkflowRun.Status.SUCCEEDED ||
+                target == WorkflowRun.Status.FAILED) {
+
+            run.setFinishedAt(OffsetDateTime.now());
+        }
+
         repo.save(run);
     }
 
-    public void markFailed(UUID runId, String error) {
-        WorkflowRun run = getRun(runId);
+    private static final Map<WorkflowRun.Status, Set<WorkflowRun.Status>> ALLOWED_TRANSITIONS =
+            Map.of(
+                    WorkflowRun.Status.CREATED, Set.of(WorkflowRun.Status.QUEUED),
 
-        if (run.getStatus() != WorkflowRun.Status.RUNNING) {
-            throw new IllegalStateException("Invalid failure transition");
-        }
+                    WorkflowRun.Status.QUEUED,
+                    Set.of(WorkflowRun.Status.RUNNING),
 
-        run.setStatus(WorkflowRun.Status.FAILED);
-        run.setDeadLettered(true);
-        run.setFinishedAt(OffsetDateTime.now());
-        run.setErrorMessage(error);
-        repo.save(run);
-    }
+                    WorkflowRun.Status.RUNNING,
+                    Set.of(
+                            WorkflowRun.Status.RETRYING,
+                            WorkflowRun.Status.SUCCEEDED,
+                            WorkflowRun.Status.FAILED
+                    ),
 
-    /**
-     * Called only from the worker retry logic after incrementAttempt.
-     */
-    public void markQueuedForRetry(UUID runId) {
-        WorkflowRun run = getRun(runId);
+                    WorkflowRun.Status.RETRYING,
+                    Set.of(
+                            WorkflowRun.Status.RUNNING,
+                            WorkflowRun.Status.FAILED
+                    ),
 
-        if (run.getStatus() != WorkflowRun.Status.RUNNING) {
-            throw new IllegalStateException("Invalid retry transition");
-        }
+                    WorkflowRun.Status.SUCCEEDED,
+                    Set.of(),
 
-        run.setStatus(WorkflowRun.Status.QUEUED);
-        repo.save(run);
-    }
+                    WorkflowRun.Status.FAILED,
+                    Set.of()
+            );
 }

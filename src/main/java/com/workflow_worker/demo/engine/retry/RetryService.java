@@ -40,21 +40,26 @@ public class RetryService {
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
-            workflowRunService.markQueuedForRetry(runId);
+            WorkflowRun updatedRun = workflowRunService.getRun(runId);
 
-            metrics.runsRetried.increment();
+            workflowRunService.transition(runId, WorkflowRun.Status.RETRYING);
+
+            int attempt = updatedRun.getAttempt();
 
             WorkflowJobMessage retryMsg = new WorkflowJobMessage();
             retryMsg.setRunId(runId);
             retryMsg.setWorkflowId(workflowId);
             retryMsg.setPayload((String) payload);
-            retryMsg.setAttempt(run.getAttempt());
+            retryMsg.setAttempt(attempt);
 
-            rabbitTemplate.convertAndSend("workflow.tasks", retryMsg);
+            String retryQueue = resolveRetryQueue(attempt);
+
+            rabbitTemplate.convertAndSend("", retryQueue, retryMsg);
+
             return;
         }
 
-        workflowRunService.markFailed(runId, ex.getMessage());
+        workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
         metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
 
@@ -65,6 +70,15 @@ public class RetryService {
         dlqMsg.setError(ex.getMessage());
         dlqMsg.setFailedAt(OffsetDateTime.now());
 
-        rabbitTemplate.convertAndSend("workflow.tasks.dlq", dlqMsg);
+        rabbitTemplate.convertAndSend("", "workflow.tasks.dlq", dlqMsg);
+    }
+
+    private String resolveRetryQueue(int attempt) {
+        return switch (attempt) {
+            case 1 -> "workflow.retry.5s";
+            case 2 -> "workflow.retry.10s";
+            case 3 -> "workflow.retry.20s";
+            default -> "workflow.retry.40s";
+        };
     }
 }
