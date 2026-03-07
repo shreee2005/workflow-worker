@@ -23,8 +23,7 @@ public class WorkflowRunService {
     }
 
     public boolean canRetry(WorkflowRun run) {
-        return run.getStatus() == WorkflowRun.Status.RUNNING
-                && run.getAttempt() < run.getMaxAttempts();
+        return run.getAttempt() < run.getMaxAttempts();
     }
 
     public void incrementAttempt(UUID runId) {
@@ -33,21 +32,29 @@ public class WorkflowRunService {
         repo.save(run);
     }
 
-    public void transition(UUID runId , WorkflowRun.Status target){
+    public void transition(UUID runId, WorkflowRun.Status target) {
+
         WorkflowRun run = getRun(runId);
         WorkflowRun.Status current = run.getStatus();
 
-        if(!ALLOWED_TRANSITIONS
-                .getOrDefault(current , Set.of())
-                .contains(target)){
-            throw new IllegalStateException("Invalid Transition" + current + " -> " + target);
+        if (!ALLOWED_TRANSITIONS
+                .getOrDefault(current, Set.of())
+                .contains(target)) {
+
+            throw new IllegalStateException(
+                    "Invalid Transition " + current + " -> " + target
+            );
         }
+
         run.setStatus(target);
 
-        if(target == WorkflowRun.Status.RUNNING){
+        if (target == WorkflowRun.Status.RUNNING) {
             run.setStartedAt(OffsetDateTime.now());
         }
-        if(target == WorkflowRun.Status.SUCCEEDED || target == WorkflowRun.Status.FAILED){
+
+        if (target == WorkflowRun.Status.SUCCEEDED ||
+                target == WorkflowRun.Status.FAILED) {
+
             run.setFinishedAt(OffsetDateTime.now());
         }
 
@@ -63,13 +70,16 @@ public class WorkflowRunService {
 
                     WorkflowRun.Status.RUNNING,
                     Set.of(
-                            WorkflowRun.Status.SUCCEEDED,
                             WorkflowRun.Status.RETRYING,
+                            WorkflowRun.Status.SUCCEEDED,
                             WorkflowRun.Status.FAILED
                     ),
 
                     WorkflowRun.Status.RETRYING,
-                    Set.of(WorkflowRun.Status.QUEUED),
+                    Set.of(
+                            WorkflowRun.Status.RUNNING,
+                            WorkflowRun.Status.FAILED
+                    ),
 
                     WorkflowRun.Status.SUCCEEDED,
                     Set.of(),

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
 @Component
 public class RetryService {
 
@@ -39,18 +40,22 @@ public class RetryService {
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
-            workflowRunService.transition(runId , WorkflowRun.Status.RETRYING);
+            WorkflowRun updatedRun = workflowRunService.getRun(runId);
 
-            metrics.runsRetried.increment();
+            workflowRunService.transition(runId, WorkflowRun.Status.RETRYING);
+
+            int attempt = updatedRun.getAttempt();
 
             WorkflowJobMessage retryMsg = new WorkflowJobMessage();
             retryMsg.setRunId(runId);
             retryMsg.setWorkflowId(workflowId);
             retryMsg.setPayload((String) payload);
-            retryMsg.setAttempt(run.getAttempt());
+            retryMsg.setAttempt(attempt);
 
-            String retryQueue = resolveRetryQueue(run.getAttempt());
-            rabbitTemplate.convertAndSend(retryQueue,retryMsg);
+            String retryQueue = resolveRetryQueue(attempt);
+
+            rabbitTemplate.convertAndSend("", retryQueue, retryMsg);
+
             return;
         }
 
@@ -65,7 +70,7 @@ public class RetryService {
         dlqMsg.setError(ex.getMessage());
         dlqMsg.setFailedAt(OffsetDateTime.now());
 
-        rabbitTemplate.convertAndSend("workflow.tasks.dlq", dlqMsg);
+        rabbitTemplate.convertAndSend("", "workflow.tasks.dlq", dlqMsg);
     }
 
     private String resolveRetryQueue(int attempt) {

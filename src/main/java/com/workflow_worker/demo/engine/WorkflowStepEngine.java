@@ -50,11 +50,14 @@ public class WorkflowStepEngine {
                 StepExecutor executor =
                         StepExecutorRegistry.get(stepDef.getType());
 
+                System.out.println("Executing step: " + stepDef.getType());
+
                 executor.execute(stepDef, (String) payload);
 
                 stepService.succeedStep(step, "OK");
 
             } catch (Exception ex) {
+                System.out.println("STEP FAILED: " + ex.getMessage());
                 stepService.failStep(step, ex.getMessage());
                 throw ex;
             }

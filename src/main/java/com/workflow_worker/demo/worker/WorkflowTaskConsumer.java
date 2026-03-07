@@ -1,20 +1,18 @@
 package com.workflow_worker.demo.worker;
+
 import com.workflow_worker.demo.engine.WorkflowStepEngine;
 import com.workflow_worker.demo.engine.lock.DistributedLockService;
 import com.workflow_worker.demo.engine.retry.RetryService;
 import com.workflow_worker.demo.entity.WorkflowRun;
-import com.workflow_worker.demo.executers.StepExecutorRegistry;
 import com.workflow_worker.demo.messaging.WorkflowJobMessage;
-import com.workflow_worker.demo.repository.WorkflowRepository;
 import com.workflow_worker.demo.service.WorkflowRunService;
-import com.workflow_worker.demo.service.WorkflowRunStepService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 @Component
 public class WorkflowTaskConsumer {
+
     private final DistributedLockService distributedLockService;
     private final RetryService retryService;
     private final WorkflowStepEngine stepEngine;
@@ -22,23 +20,23 @@ public class WorkflowTaskConsumer {
     private final WorkflowMetrics metrics;
 
     public WorkflowTaskConsumer(
-            DistributedLockService distributedLockService, WorkflowRepository workflowRepository,
+            DistributedLockService distributedLockService,
             WorkflowRunService workflowRunService,
-            WorkflowRunStepService stepService,
-            StepExecutorRegistry executorRegistry, RetryService retryService, WorkflowStepEngine stepEngine,
-            WorkflowMetrics metrics,
-            RabbitTemplate rabbitTemplate
+            RetryService retryService,
+            WorkflowStepEngine stepEngine,
+            WorkflowMetrics metrics
     ) {
         this.distributedLockService = distributedLockService;
-
         this.workflowRunService = workflowRunService;
         this.retryService = retryService;
         this.stepEngine = stepEngine;
         this.metrics = metrics;
-
     }
 
-    @RabbitListener(queues = "workflow.tasks")
+    @RabbitListener(
+            queues = "workflow.tasks",
+            containerFactory = "rabbitListenerContainerFactory"
+    )
     public void handleTask(WorkflowJobMessage message) {
 
         UUID runId = message.getRunId();
@@ -49,30 +47,35 @@ public class WorkflowTaskConsumer {
         }
 
         try {
-            workflowRunService.transition(runId , WorkflowRun.Status.RUNNING);
-            metrics.runsStarted.increment();
-        } catch (IllegalStateException e) {
-            return;
-        }
-        try{
+
+            WorkflowRun run = workflowRunService.getRun(runId);
+
+            if (run.getStatus() == WorkflowRun.Status.QUEUED ||
+                    run.getStatus() == WorkflowRun.Status.RETRYING) {
+
+                workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
+                metrics.runsStarted.increment();
+            }
+
             stepEngine.executeSteps(
                     runId,
                     workflowId,
                     message.getPayload()
             );
 
-            workflowRunService.transition(runId , WorkflowRun.Status.SUCCEEDED);
+            workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
             metrics.runsSucceeded.increment();
-        }
-        catch (Exception ex) {
+
+        } catch (Exception ex) {
+
             retryService.handleFailure(
                     runId,
                     workflowId,
                     message.getPayload(),
                     ex
             );
-        }
-        finally {
+
+        } finally {
             distributedLockService.release(runId);
         }
     }
