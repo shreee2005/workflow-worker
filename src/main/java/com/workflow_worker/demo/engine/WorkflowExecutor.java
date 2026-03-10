@@ -1,22 +1,30 @@
 package com.workflow_worker.demo.engine;
+
 import com.workflow_worker.demo.entity.Workflow;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
 import com.workflow_worker.demo.repository.WorkflowRepository;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
 import com.workflow_worker.demo.workflow.StepDefinition;
 import com.workflow_worker.demo.workflow.WorkflowSpecParser;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.UUID;
 
+@Component
 public class WorkflowExecutor {
+
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunStepService stepService;
     private final StepDispatcher dispatcher;
 
-    public WorkflowExecutor(WorkflowRepository workflowRepository, WorkflowRunStepService stepService, StepDispatcher dispatcher) {
+    public WorkflowExecutor(
+            WorkflowRepository workflowRepository,
+            WorkflowRunStepService stepService,
+            StepDispatcher dispatcher
+    ) {
         this.workflowRepository = workflowRepository;
         this.stepService = stepService;
-
         this.dispatcher = dispatcher;
     }
 
@@ -24,33 +32,38 @@ public class WorkflowExecutor {
             UUID runId,
             UUID workflowId,
             String payload
-    ) throws Exception{
+    ) {
+
         Workflow wf = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new RuntimeException("Workflow Not Found"));
+                .orElseThrow(() -> new RuntimeException("Workflow not found"));
 
         List<StepDefinition> steps =
                 WorkflowSpecParser.parse(wf.getSpec());
 
-        for (int i = 0; i < steps.size(); i++) {
+        int nextStepIndex =
+                stepService.getNextPendingStepIndex(runId);
 
-            StepDefinition stepDef = steps.get(i);
+        if (nextStepIndex >= steps.size()) {
+            return;
+        }
 
-            WorkflowRunStep step =
-                    stepService.startStep(runId, i, stepDef.getType());
+        StepDefinition stepDef = steps.get(nextStepIndex);
 
-            StepExecutionResult result =
-                    dispatcher.dispatch(stepDef, payload);
+        WorkflowRunStep step =
+                stepService.startStep(runId, nextStepIndex, stepDef.getType());
 
-            if (result.getStatus() == StepExecutionResult.Status.SUCCESS) {
+        StepExecutionResult result =
+                dispatcher.dispatch(stepDef, payload);
 
-                stepService.succeedStep(step, result.getOutput());
+        if (result.getStatus() == StepExecutionResult.Status.SUCCESS) {
 
-            } else {
+            stepService.succeedStep(step, result.getOutput());
 
-                stepService.failStep(step, result.getError());
+        } else {
 
-                throw new RuntimeException(result.getError());
-            }
+            stepService.failStep(step, result.getError());
+
+            throw new RuntimeException(result.getError());
         }
     }
 }

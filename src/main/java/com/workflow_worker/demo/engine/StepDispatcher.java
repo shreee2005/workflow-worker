@@ -7,18 +7,33 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class StepDispatcher {
-    public StepExecutionResult dispatch(
-            StepDefinition step ,
-            String payload
-    ){
-        try {
-            StepExecutor executor =
-                    StepExecutorRegistry.get(step.getType());
 
-            executor.execute(step , payload);
-            return  StepExecutionResult.success("OK");
+    private final StepExecutorRegistry registry;
+
+    public StepDispatcher(StepExecutorRegistry registry) {
+        this.registry = registry;
+    }
+
+    public StepExecutionResult dispatch(
+            StepDefinition step,
+            String payload
+    ) {
+
+        try {
+
+            StepExecutor executor =
+                    registry.get(step.getType());
+
+            String output =
+                    executor.execute(step, payload);
+
+            return StepExecutionResult.success(output);
+
         } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage());
+
+            return StepExecutionResult.failure(
+                    ex.getMessage()
+            );
         }
     }
 }
