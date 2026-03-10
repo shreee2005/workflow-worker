@@ -37,12 +37,26 @@ public class RetryService {
 
         WorkflowRun run = workflowRunService.getRun(runId);
 
+        /*
+         Prevent duplicate retries if another worker
+         already moved the run to a terminal state
+        */
+        if (run.getStatus() == WorkflowRun.Status.FAILED ||
+                run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
+
+            return;
+        }
+
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
+
             WorkflowRun updatedRun = workflowRunService.getRun(runId);
 
-            workflowRunService.transition(runId, WorkflowRun.Status.RETRYING);
+            workflowRunService.transition(
+                    runId,
+                    WorkflowRun.Status.RETRYING
+            );
 
             int attempt = updatedRun.getAttempt();
 
@@ -54,12 +68,22 @@ public class RetryService {
 
             String retryQueue = resolveRetryQueue(attempt);
 
-            rabbitTemplate.convertAndSend("", retryQueue, retryMsg);
+            rabbitTemplate.convertAndSend(
+                    "",
+                    retryQueue,
+                    retryMsg
+            );
+
+            metrics.runsRetried.increment();
 
             return;
         }
 
-        workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+        workflowRunService.transition(
+                runId,
+                WorkflowRun.Status.FAILED
+        );
+
         metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
 
@@ -70,15 +94,22 @@ public class RetryService {
         dlqMsg.setError(ex.getMessage());
         dlqMsg.setFailedAt(OffsetDateTime.now());
 
-        rabbitTemplate.convertAndSend("", "workflow.tasks.dlq", dlqMsg);
+        rabbitTemplate.convertAndSend(
+                "",
+                "workflow.tasks.dlq",
+                dlqMsg
+        );
     }
 
     private String resolveRetryQueue(int attempt) {
+
         return switch (attempt) {
+
             case 1 -> "workflow.retry.5s";
             case 2 -> "workflow.retry.10s";
             case 3 -> "workflow.retry.20s";
             default -> "workflow.retry.40s";
+
         };
     }
 }

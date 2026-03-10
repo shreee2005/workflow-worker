@@ -10,26 +10,39 @@ import java.util.Map;
 @Component
 public class StepExecutorRegistry {
 
-    private static final Map<String, StepExecutor> executors = new HashMap<>();
+    private final Map<String, StepExecutor> executors = new HashMap<>();
 
     public StepExecutorRegistry(List<StepExecutor> executorList) {
-        for (StepExecutor ex : executorList) {
-            executors.put(
-                    ex.getClass()
-                            .getSimpleName()
-                            .replace("StepExecutor", "")
-                            .toUpperCase(),
-                    ex
-            );
+
+        for (StepExecutor executor : executorList) {
+
+            String key = resolveKey(executor);
+
+            executors.put(key, executor);
         }
     }
 
-    public static StepExecutor get(String type) {
-        StepExecutor ex = executors.get(type.toUpperCase());
-        if (ex == null) {
-            throw new RuntimeException("Unknown step type: " + type);
+    public StepExecutor get(String type) {
+
+        StepExecutor executor = executors.get(type);
+
+        if (executor == null) {
+            throw new RuntimeException("No StepExecutor registered for type: " + type);
         }
-        return ex;
+
+        return executor;
+    }
+
+    private String resolveKey(StepExecutor executor) {
+
+        if (executor instanceof HttpCallStepExecutor) {
+            return "http";
+        }
+
+        if (executor instanceof LogStepExecutor) {
+            return "log";
+        }
+
+        throw new RuntimeException("Unknown StepExecutor type: " + executor.getClass());
     }
 }
-
