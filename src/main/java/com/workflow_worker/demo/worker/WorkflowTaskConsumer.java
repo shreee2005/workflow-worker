@@ -18,20 +18,17 @@ public class WorkflowTaskConsumer {
     private final RetryService retryService;
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunService workflowRunService;
-    private final WorkflowMetrics metrics;
 
     public WorkflowTaskConsumer(
             DistributedLockService distributedLockService,
             WorkflowRunService workflowRunService,
             RetryService retryService,
-            WorkflowExecutor workflowExecutor,
-            WorkflowMetrics metrics
+            WorkflowExecutor workflowExecutor
     ) {
         this.distributedLockService = distributedLockService;
         this.workflowRunService = workflowRunService;
         this.retryService = retryService;
         this.workflowExecutor = workflowExecutor;
-        this.metrics = metrics;
     }
 
     @RabbitListener(
@@ -54,8 +51,10 @@ public class WorkflowTaskConsumer {
             if (run.getStatus() == WorkflowRun.Status.QUEUED ||
                     run.getStatus() == WorkflowRun.Status.RETRYING) {
 
-                workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
-                metrics.runsStarted.increment();
+                workflowRunService.transition(
+                        runId,
+                        WorkflowRun.Status.RUNNING
+                );
             }
 
             workflowExecutor.executeRun(
@@ -64,8 +63,10 @@ public class WorkflowTaskConsumer {
                     message.getPayload()
             );
 
-            workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
-            metrics.runsSucceeded.increment();
+            workflowRunService.transition(
+                    runId,
+                    WorkflowRun.Status.SUCCEEDED
+            );
 
         } catch (Exception ex) {
 

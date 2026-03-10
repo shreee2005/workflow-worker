@@ -1,7 +1,9 @@
 package com.workflow_worker.demo.service;
 
+import com.workflow_worker.demo.engine.events.*;
 import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.repository.WorkflowRunRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -13,9 +15,14 @@ import java.util.UUID;
 public class WorkflowRunService {
 
     private final WorkflowRunRepository repo;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public WorkflowRunService(WorkflowRunRepository repo) {
+    public WorkflowRunService(
+            WorkflowRunRepository repo,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.repo = repo;
+        this.eventPublisher = eventPublisher;
     }
 
     public WorkflowRun getRun(UUID runId) {
@@ -49,13 +56,37 @@ public class WorkflowRunService {
         run.setStatus(target);
 
         if (target == WorkflowRun.Status.RUNNING) {
+
             run.setStartedAt(OffsetDateTime.now());
+
+            eventPublisher.publishEvent(
+                    new WorkflowStartedEvent(runId, run.getWorkflowId())
+            );
         }
 
-        if (target == WorkflowRun.Status.SUCCEEDED ||
-                target == WorkflowRun.Status.FAILED) {
+        if (target == WorkflowRun.Status.RETRYING) {
+
+            eventPublisher.publishEvent(
+                    new WorkflowRetryEvent(runId, run.getAttempt())
+            );
+        }
+
+        if (target == WorkflowRun.Status.SUCCEEDED) {
 
             run.setFinishedAt(OffsetDateTime.now());
+
+            eventPublisher.publishEvent(
+                    new WorkflowSucceededEvent(runId)
+            );
+        }
+
+        if (target == WorkflowRun.Status.FAILED) {
+
+            run.setFinishedAt(OffsetDateTime.now());
+
+            eventPublisher.publishEvent(
+                    new WorkflowFailedEvent(runId, run.getErrorMessage())
+            );
         }
 
         repo.save(run);
@@ -63,7 +94,8 @@ public class WorkflowRunService {
 
     private static final Map<WorkflowRun.Status, Set<WorkflowRun.Status>> ALLOWED_TRANSITIONS =
             Map.of(
-                    WorkflowRun.Status.CREATED, Set.of(WorkflowRun.Status.QUEUED),
+                    WorkflowRun.Status.CREATED,
+                    Set.of(WorkflowRun.Status.QUEUED),
 
                     WorkflowRun.Status.QUEUED,
                     Set.of(WorkflowRun.Status.RUNNING),
