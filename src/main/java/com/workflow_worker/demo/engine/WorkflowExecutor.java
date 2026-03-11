@@ -52,6 +52,9 @@ public class WorkflowExecutor {
         WorkflowRunStep step =
                 stepService.startStep(runId, nextStepIndex, stepDef.getType());
 
+        System.out.println("STEP TYPE = " + stepDef.getType());
+        System.out.println("STEP CONFIG = " + stepDef.getConfig());
+
         StepExecutionResult result =
                 dispatcher.dispatch(stepDef, payload);
 

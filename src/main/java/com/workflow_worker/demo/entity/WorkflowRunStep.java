@@ -115,5 +115,4 @@ public class WorkflowRunStep {
     public void setRunId(UUID runId) {
         this.runId = runId;
     }
-// getters & setters
 }

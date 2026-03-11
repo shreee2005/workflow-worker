@@ -3,6 +3,7 @@ package com.workflow_worker.demo.engine.retry;
 import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.messaging.WorkflowDlqMessage;
 import com.workflow_worker.demo.messaging.WorkflowJobMessage;
+import com.workflow_worker.demo.repository.WorkflowRunRepository;
 import com.workflow_worker.demo.service.WorkflowRunService;
 import com.workflow_worker.demo.worker.WorkflowMetrics;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -15,15 +16,18 @@ import java.util.UUID;
 public class RetryService {
 
     private final WorkflowRunService workflowRunService;
+    private final WorkflowRunRepository workflowRunRepository;
     private final RabbitTemplate rabbitTemplate;
     private final WorkflowMetrics metrics;
 
     public RetryService(
             WorkflowRunService workflowRunService,
+            WorkflowRunRepository workflowRunRepository,
             RabbitTemplate rabbitTemplate,
             WorkflowMetrics metrics
     ) {
         this.workflowRunService = workflowRunService;
+        this.workflowRunRepository = workflowRunRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.metrics = metrics;
     }
@@ -43,10 +47,12 @@ public class RetryService {
         */
         if (run.getStatus() == WorkflowRun.Status.FAILED ||
                 run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
-
             return;
         }
 
+        /*
+         Retry logic
+        */
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
@@ -79,10 +85,12 @@ public class RetryService {
             return;
         }
 
-        workflowRunService.transition(
-                runId,
-                WorkflowRun.Status.FAILED
-        );
+        WorkflowRun failedRun = workflowRunService.getRun(runId);
+
+        failedRun.setDeadLettered(true);
+        failedRun.setStatus(WorkflowRun.Status.FAILED);
+
+        workflowRunRepository.save(failedRun);
 
         metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
