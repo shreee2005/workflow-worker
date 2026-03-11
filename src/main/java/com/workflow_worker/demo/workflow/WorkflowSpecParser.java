@@ -1,12 +1,10 @@
 package com.workflow_worker.demo.workflow;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class WorkflowSpecParser {
 
@@ -15,6 +13,7 @@ public class WorkflowSpecParser {
     public static List<StepDefinition> parse(String specJson) {
 
         try {
+
             JsonNode root = mapper.readTree(specJson);
             JsonNode stepsNode = root.get("steps");
 
@@ -24,14 +23,26 @@ public class WorkflowSpecParser {
 
             List<StepDefinition> steps = new ArrayList<>();
 
-            for (Iterator<JsonNode> it = stepsNode.elements(); it.hasNext(); ) {
-                JsonNode node = it.next();
+            for (JsonNode node : stepsNode) {
 
                 StepDefinition def = new StepDefinition();
+
                 def.setType(node.get("type").asText());
-                def.setConfig(
-                        mapper.convertValue(node, Map.class)
-                );
+
+                JsonNode configNode = node.get("config");
+
+                Map<String,Object> config;
+
+                if (configNode == null || configNode.isNull()) {
+                    config = new HashMap<>();
+                } else {
+                    config = mapper.convertValue(
+                            configNode,
+                            new TypeReference<Map<String,Object>>() {}
+                    );
+                }
+
+                def.setConfig(config);
 
                 steps.add(def);
             }
@@ -43,4 +54,3 @@ public class WorkflowSpecParser {
         }
     }
 }
-
