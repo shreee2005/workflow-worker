@@ -41,18 +41,11 @@ public class RetryService {
 
         WorkflowRun run = workflowRunService.getRun(runId);
 
-        /*
-         Prevent duplicate retries if another worker
-         already moved the run to a terminal state
-        */
         if (run.getStatus() == WorkflowRun.Status.FAILED ||
                 run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
             return;
         }
 
-        /*
-         Retry logic
-        */
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
@@ -85,13 +78,8 @@ public class RetryService {
             return;
         }
 
-        WorkflowRun failedRun = workflowRunService.getRun(runId);
-
-        failedRun.setDeadLettered(true);
-        failedRun.setStatus(WorkflowRun.Status.FAILED);
-
-        workflowRunRepository.save(failedRun);
-
+        workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+        workflowRunRepository.markDeadLettered(runId);
         metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
 
