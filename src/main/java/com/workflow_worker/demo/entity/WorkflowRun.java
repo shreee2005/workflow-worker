@@ -38,7 +38,7 @@ public class WorkflowRun{
     private boolean deadLettered = false;
 
     public boolean isDeadLettered() {
-        return deadLettered;
+        return deadLettered; // Dead Lettered Flag Issue
     }
 
     public void setDeadLettered(boolean deadLettered) {
