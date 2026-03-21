@@ -15,6 +15,17 @@ public class WorkflowRun{
     @Column(name = "workflow_id", nullable = false)
     private UUID workflowId;
 
+    @Column(name = "workflow_version_id", nullable = false)
+    private UUID workflowVersionId;
+
+    public UUID getWorkflowVersionId() {
+        return workflowVersionId;
+    }
+
+    public void setWorkflowVersionId(UUID workflowVersionId) {
+        this.workflowVersionId = workflowVersionId;
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status;
