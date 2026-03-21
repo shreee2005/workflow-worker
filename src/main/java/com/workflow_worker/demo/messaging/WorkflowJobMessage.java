@@ -3,8 +3,17 @@ import java.util.UUID;
 public class WorkflowJobMessage {
     private UUID runId;
     private UUID workflowId;
+    private UUID workflowVersionId;
     private String payload;
     private int attempt;
+
+    public UUID getWorkflowVersionId() {
+        return workflowVersionId;
+    }
+
+    public void setWorkflowVersionId(UUID workflowVersionId) {
+        this.workflowVersionId = workflowVersionId;
+    }
 
     public int getAttempt() {
         return attempt;

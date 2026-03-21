@@ -1,8 +1,8 @@
 package com.workflow_worker.demo.engine;
 
-import com.workflow_worker.demo.entity.Workflow;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
-import com.workflow_worker.demo.repository.WorkflowRepository;
+import com.workflow_worker.demo.entity.WorkflowVersion;
+import com.workflow_worker.demo.repository.WorkflowVersionRepository;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
 import com.workflow_worker.demo.workflow.StepDefinition;
 import com.workflow_worker.demo.workflow.WorkflowSpecParser;
@@ -14,16 +14,16 @@ import java.util.UUID;
 @Component
 public class WorkflowExecutor {
 
-    private final WorkflowRepository workflowRepository;
+    private final WorkflowVersionRepository workflowVersionRepository;
     private final WorkflowRunStepService stepService;
     private final StepDispatcher dispatcher;
 
     public WorkflowExecutor(
-            WorkflowRepository workflowRepository,
+            WorkflowVersionRepository workflowVersionRepository,
             WorkflowRunStepService stepService,
             StepDispatcher dispatcher
     ) {
-        this.workflowRepository = workflowRepository;
+        this.workflowVersionRepository = workflowVersionRepository;
         this.stepService = stepService;
         this.dispatcher = dispatcher;
     }
@@ -31,14 +31,19 @@ public class WorkflowExecutor {
     public void executeRun(
             UUID runId,
             UUID workflowId,
+            UUID workflowVersionId,
             String payload
     ) {
 
-        Workflow wf = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new RuntimeException("Workflow not found"));
+        WorkflowVersion wfVersion = workflowVersionRepository.findById(workflowVersionId)
+                .orElseThrow(() -> new RuntimeException("Workflow version not found"));
+
+        if (!wfVersion.getWorkflowId().equals(workflowId)) {
+            throw new RuntimeException("Workflow version does not belong to workflow");
+        }
 
         List<StepDefinition> steps =
-                WorkflowSpecParser.parse(wf.getSpec());
+                WorkflowSpecParser.parse(wfVersion.getSpec());
 
         int nextStepIndex =
                 stepService.getNextPendingStepIndex(runId);

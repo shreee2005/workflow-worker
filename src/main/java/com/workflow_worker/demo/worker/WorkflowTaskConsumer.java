@@ -39,6 +39,7 @@ public class WorkflowTaskConsumer {
 
         UUID runId = message.getRunId();
         UUID workflowId = message.getWorkflowId();
+        UUID workflowVersionId = message.getWorkflowVersionId();
 
         if (!distributedLockService.acquire(runId)) {
             return;
@@ -60,6 +61,7 @@ public class WorkflowTaskConsumer {
             workflowExecutor.executeRun(
                     runId,
                     workflowId,
+                    workflowVersionId,
                     message.getPayload()
             );
 
