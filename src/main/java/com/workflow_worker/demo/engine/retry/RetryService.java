@@ -41,6 +41,10 @@ public class RetryService {
 
         WorkflowRun run = workflowRunService.getRun(runId);
 
+        if (run.getStatus() == WorkflowRun.Status.WAITING) {
+            return; // WAIT is not a failure
+        }
+
         if (run.getStatus() == WorkflowRun.Status.FAILED ||
                 run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
             return;

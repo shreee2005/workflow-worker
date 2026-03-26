@@ -10,23 +10,23 @@ import java.util.Map;
 public class HttpCallStepExecutor implements StepExecutor {
 
     @Override
-    public String execute(
-            StepDefinition step,
-            String payload
-    ) {
+    public String getType() {
+        return "HTTP_CALL";
+    }
 
+    @Override
+    public String execute(StepDefinition step, String payload) {
         Map<String, Object> config = step.getConfig();
 
-        if (config == null || !config.containsKey("url")) {
-            throw new RuntimeException("HTTP step missing 'url' config");
+        if (config == null || !config.containsKey("url") || config.get("url") == null) {
+            throw new RuntimeException("HTTP_CALL step missing 'url' config");
         }
 
-        String url = config.get("url").toString();
+        String url = String.valueOf(config.get("url")).trim();
 
-        System.out.println("[HTTP CALL] Calling " + url);
+        System.out.println("[HTTP_CALL] Calling " + url + " payload=" + payload);
 
-        // future: RestTemplate / WebClient
-
+        // TODO: Replace with RestTemplate/WebClient real call
         return "HTTP_CALL_SUCCESS";
     }
 }

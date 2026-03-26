@@ -59,29 +59,50 @@ public class WorkflowRunStepService {
      * 1. If a step FAILED → retry that step
      * 2. Otherwise run the next index after the last succeeded step
      */
+    public WorkflowRunStep markStepWaiting(UUID runId, int stepIndex, String stepType, String logs) {
+        WorkflowRunStep step = new WorkflowRunStep();
+        step.setId(UUID.randomUUID());
+        step.setRunId(runId);
+        step.setStepIndex(stepIndex);
+        step.setStepType(stepType);
+        step.setStatus(WorkflowRunStep.Status.WAITING);
+        step.setStartedAt(OffsetDateTime.now());
+        step.setFinishedAt(OffsetDateTime.now());
+        step.setLogs(logs);
+        return repo.save(step);
+    }
+
     public int getNextPendingStepIndex(UUID runId) {
+        List<WorkflowRunStep> existing = repo.findByRunId(runId);
 
-        List<WorkflowRunStep> steps =
-                repo.findByRunIdOrderByStepIndexAsc(runId);
-
-        if (steps.isEmpty()) {
+        if (existing.isEmpty()) {
             return 0;
         }
 
-        int lastSucceededIndex = -1;
+        // hard block only on WAITING (external callback needed)
+        boolean hasWaiting = existing.stream()
+                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.WAITING);
 
-        for (WorkflowRunStep step : steps) {
-
-            if (step.getStatus() == WorkflowRunStep.Status.FAILED) {
-                return step.getStepIndex();
-            }
-
-            if (step.getStatus() == WorkflowRunStep.Status.SUCCEEDED) {
-                lastSucceededIndex = step.getStepIndex();
-            }
+        if (hasWaiting) {
+            return Integer.MAX_VALUE;
         }
 
-        return lastSucceededIndex + 1;
+        // if any FAILED step exists, let caller handle failure/retry path (don't advance)
+        boolean hasFailed = existing.stream()
+                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
+
+        if (hasFailed) {
+            return Integer.MAX_VALUE;
+        }
+
+        // normal progress: next index after highest SUCCEEDED step
+        int maxSucceeded = existing.stream()
+                .filter(s -> s.getStatus() == WorkflowRunStep.Status.SUCCEEDED)
+                .map(WorkflowRunStep::getStepIndex)
+                .max(Comparator.naturalOrder())
+                .orElse(-1);
+
+        return maxSucceeded + 1;
     }
 
     private void transition(
@@ -113,11 +134,18 @@ public class WorkflowRunStepService {
                             WorkflowRunStep.Status.SUCCEEDED,
                             WorkflowRunStep.Status.FAILED
                     ),
-
+                    WorkflowRunStep.Status.WAITING,
+                    Set.of(
+                            WorkflowRunStep.Status.RUNNING
+                    ),
                     WorkflowRunStep.Status.SUCCEEDED,
                     Set.of(),
 
                     WorkflowRunStep.Status.FAILED,
                     Set.of()
             );
+
+    public void save(WorkflowRunStep step) {
+        repo.save(step);
+    }
 }

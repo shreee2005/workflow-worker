@@ -10,5 +10,7 @@ public interface WorkflowRunStepRepository
         extends JpaRepository<WorkflowRunStep, UUID> {
 
     List<WorkflowRunStep> findByRunIdOrderByStepIndexAsc(UUID runId);
+
+    List<WorkflowRunStep> findByRunId(UUID runId);
 }
 

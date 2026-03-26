@@ -13,36 +13,33 @@ public class StepExecutorRegistry {
     private final Map<String, StepExecutor> executors = new HashMap<>();
 
     public StepExecutorRegistry(List<StepExecutor> executorList) {
-
         for (StepExecutor executor : executorList) {
+            String key = normalize(executor.getType());
 
-            String key = resolveKey(executor);
+            if (key.isBlank()) {
+                throw new RuntimeException("StepExecutor returned blank type: " + executor.getClass().getName());
+            }
+
+            if (executors.containsKey(key)) {
+                throw new RuntimeException("Duplicate StepExecutor type registration: " + key);
+            }
 
             executors.put(key, executor);
         }
     }
 
     public StepExecutor get(String type) {
-
-        StepExecutor executor = executors.get(type);
+        String key = normalize(type);
+        StepExecutor executor = executors.get(key);
 
         if (executor == null) {
-            throw new RuntimeException("No StepExecutor registered for type: " + type);
+            throw new RuntimeException("No StepExecutor registered for type: " + key);
         }
 
         return executor;
     }
 
-    private String resolveKey(StepExecutor executor) {
-
-        if (executor instanceof HttpCallStepExecutor) {
-            return "http";
-        }
-
-        if (executor instanceof LogStepExecutor) {
-            return "log";
-        }
-
-        throw new RuntimeException("Unknown StepExecutor type: " + executor.getClass());
+    private String normalize(String type) {
+        return type == null ? "" : type.trim().toUpperCase();
     }
 }
