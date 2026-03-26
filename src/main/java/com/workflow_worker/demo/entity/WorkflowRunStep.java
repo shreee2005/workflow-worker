@@ -39,6 +39,7 @@ public class WorkflowRunStep {
 
     public enum Status {
         PENDING,
+        WAITING,
         RUNNING,
         SUCCEEDED,
         FAILED

@@ -44,6 +44,10 @@ public class WorkflowRunService {
         WorkflowRun run = getRun(runId);
         WorkflowRun.Status current = run.getStatus();
 
+        if (current == target) {
+            return;
+        }
+
         if (!ALLOWED_TRANSITIONS
                 .getOrDefault(current, Set.of())
                 .contains(target)) {
@@ -89,6 +93,7 @@ public class WorkflowRunService {
             );
         }
 
+
         repo.save(run);
     }
 
@@ -103,13 +108,19 @@ public class WorkflowRunService {
                     WorkflowRun.Status.RUNNING,
                     Set.of(
                             WorkflowRun.Status.RETRYING,
+                            WorkflowRun.Status.WAITING,
                             WorkflowRun.Status.SUCCEEDED,
                             WorkflowRun.Status.FAILED
                     ),
 
+                    WorkflowRun.Status.WAITING,
+                    Set.of(
+                            WorkflowRun.Status.RUNNING
+                    ),
                     WorkflowRun.Status.RETRYING,
                     Set.of(
                             WorkflowRun.Status.RUNNING,
+                            WorkflowRun.Status.WAITING,
                             WorkflowRun.Status.FAILED
                     ),
 

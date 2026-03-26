@@ -1,5 +1,6 @@
 package com.workflow_worker.demo.worker;
 
+import com.workflow_worker.demo.engine.ExecutionOutcome;
 import com.workflow_worker.demo.engine.WorkflowExecutor;
 import com.workflow_worker.demo.engine.lock.DistributedLockService;
 import com.workflow_worker.demo.engine.retry.RetryService;
@@ -31,56 +32,44 @@ public class WorkflowTaskConsumer {
         this.workflowExecutor = workflowExecutor;
     }
 
-    @RabbitListener(
-            queues = "workflow.tasks",
-            containerFactory = "rabbitListenerContainerFactory"
-    )
+    @RabbitListener(queues = "workflow.tasks", containerFactory = "rabbitListenerContainerFactory")
     public void handleTask(WorkflowJobMessage message) {
-
         UUID runId = message.getRunId();
         UUID workflowId = message.getWorkflowId();
         UUID workflowVersionId = message.getWorkflowVersionId();
 
-        if (!distributedLockService.acquire(runId)) {
-            return;
-        }
+        if (!distributedLockService.acquire(runId)) return;
 
         try {
-
             WorkflowRun run = workflowRunService.getRun(runId);
 
             if (run.getStatus() == WorkflowRun.Status.QUEUED ||
-                    run.getStatus() == WorkflowRun.Status.RETRYING) {
-
-                workflowRunService.transition(
-                        runId,
-                        WorkflowRun.Status.RUNNING
-                );
+                    run.getStatus() == WorkflowRun.Status.RETRYING ||
+                    run.getStatus() == WorkflowRun.Status.WAITING) {
+                workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
             }
 
-            workflowExecutor.executeRun(
-                    runId,
-                    workflowId,
-                    workflowVersionId,
-                    message.getPayload()
+            ExecutionOutcome outcome = workflowExecutor.executeRun(
+                    runId, workflowId, workflowVersionId, message.getPayload()
             );
 
-            workflowRunService.transition(
-                    runId,
-                    WorkflowRun.Status.SUCCEEDED
-            );
+            if (outcome == ExecutionOutcome.WAITING) {
+                // IMPORTANT: keep run consistent
+                workflowRunService.transition(runId, WorkflowRun.Status.WAITING);
+                return;
+            }
+
+            // outcome == COMPLETED
+            workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
 
         } catch (Exception ex) {
+            WorkflowRun latest = workflowRunService.getRun(runId);
 
-            retryService.handleFailure(
-                    runId,
-                    workflowId,
-                    message.getPayload(),
-                    ex
-            );
+            // never retry if already waiting
+            if (latest.getStatus() == WorkflowRun.Status.WAITING) return;
 
+            retryService.handleFailure(runId, workflowId, message.getPayload(), ex);
         } finally {
-
             distributedLockService.release(runId);
         }
     }

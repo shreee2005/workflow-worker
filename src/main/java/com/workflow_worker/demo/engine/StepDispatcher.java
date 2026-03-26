@@ -14,26 +14,18 @@ public class StepDispatcher {
         this.registry = registry;
     }
 
-    public StepExecutionResult dispatch(
-            StepDefinition step,
-            String payload
-    ) {
-
+    public StepExecutionResult dispatch(StepDefinition step, String payload) {
         try {
-
-            StepExecutor executor =
-                    registry.get(step.getType());
-
-            String output =
-                    executor.execute(step, payload);
-
+            String type = normalize(step.getType());
+            StepExecutor executor = registry.get(type); // normalized type lookup
+            String output = executor.execute(step, payload);
             return StepExecutionResult.success(output);
-
         } catch (Exception ex) {
-
-            return StepExecutionResult.failure(
-                    ex.getMessage()
-            );
+            return StepExecutionResult.failure(ex.getMessage());
         }
+    }
+
+    private String normalize(String s) {
+        return s == null ? "" : s.trim().toUpperCase();
     }
 }
