@@ -54,8 +54,9 @@ public class WorkflowExecutor {
 
         List<StepDefinition> steps = WorkflowSpecParser.parse(wfVersion.getSpec());
         int nextStepIndex = stepService.getNextPendingStepIndex(runId);
-
-        if (nextStepIndex == Integer.MAX_VALUE) return ExecutionOutcome.WAITING;
+        System.out.println("[EXECUTOR] runId=" + runId + " nextStepIndex=" + nextStepIndex);
+        if (nextStepIndex == Integer.MAX_VALUE) return ExecutionOutcome.WAITING; // blocked on callback
+        if (nextStepIndex == -1) return ExecutionOutcome.COMPLETED;              // terminal failed path
         if (nextStepIndex >= steps.size()) return ExecutionOutcome.COMPLETED;
 
         StepDefinition stepDef = steps.get(nextStepIndex);
@@ -85,7 +86,7 @@ public class WorkflowExecutor {
         }
 
         stepService.failStep(step, result.getError());
-        throw new RuntimeException(result.getError());
+        return ExecutionOutcome.COMPLETED;
     }
 
     private String createWaitState(

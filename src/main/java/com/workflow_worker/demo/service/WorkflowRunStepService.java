@@ -79,23 +79,22 @@ public class WorkflowRunStepService {
             return 0;
         }
 
-        // hard block only on WAITING (external callback needed)
+        // hard block on WAITING (external callback needed)
         boolean hasWaiting = existing.stream()
                 .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.WAITING);
 
         if (hasWaiting) {
-            return Integer.MAX_VALUE;
+            return Integer.MAX_VALUE; // means WAITING
         }
 
-        // if any FAILED step exists, let caller handle failure/retry path (don't advance)
+        // if any FAILED exists, treat as terminal (no next step to run)
         boolean hasFailed = existing.stream()
                 .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
 
         if (hasFailed) {
-            return Integer.MAX_VALUE;
+            return -1; // means FAILED terminal
         }
 
-        // normal progress: next index after highest SUCCEEDED step
         int maxSucceeded = existing.stream()
                 .filter(s -> s.getStatus() == WorkflowRunStep.Status.SUCCEEDED)
                 .map(WorkflowRunStep::getStepIndex)
@@ -103,6 +102,11 @@ public class WorkflowRunStepService {
                 .orElse(-1);
 
         return maxSucceeded + 1;
+    }
+
+    public boolean hasFailedStep(UUID runId) {
+        return repo.findByRunId(runId).stream()
+                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
     }
 
     private void transition(

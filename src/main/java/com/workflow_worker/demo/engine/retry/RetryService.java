@@ -32,74 +32,74 @@ public class RetryService {
         this.metrics = metrics;
     }
 
-    public void handleFailure(
-            UUID runId,
-            UUID workflowId,
-            Object payload,
-            Exception ex
-    ) {
+        public void handleFailure(
+                UUID runId,
+                UUID workflowId,
+                Object payload,
+                Exception ex
+        ) {
 
-        WorkflowRun run = workflowRunService.getRun(runId);
+            WorkflowRun run = workflowRunService.getRun(runId);
 
-        if (run.getStatus() == WorkflowRun.Status.WAITING) {
-            return; // WAIT is not a failure
-        }
+            if (run.getStatus() == WorkflowRun.Status.WAITING) {
+                return; // WAIT is not a failure
+            }
 
-        if (run.getStatus() == WorkflowRun.Status.FAILED ||
-                run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
-            return;
-        }
+            if (run.getStatus() == WorkflowRun.Status.FAILED ||
+                    run.getStatus() == WorkflowRun.Status.SUCCEEDED) {
+                return;
+            }
 
-        if (workflowRunService.canRetry(run)) {
+            if (workflowRunService.canRetry(run)) {
 
-            workflowRunService.incrementAttempt(runId);
+                workflowRunService.incrementAttempt(runId);
 
-            WorkflowRun updatedRun = workflowRunService.getRun(runId);
+                WorkflowRun updatedRun = workflowRunService.getRun(runId);
 
-            workflowRunService.transition(
-                    runId,
-                    WorkflowRun.Status.RETRYING
-            );
+                workflowRunService.transition(
+                        runId,
+                        WorkflowRun.Status.RETRYING
+                );
 
-            int attempt = updatedRun.getAttempt();
+                int attempt = updatedRun.getAttempt();
 
-            WorkflowJobMessage retryMsg = new WorkflowJobMessage();
-            retryMsg.setRunId(runId);
-            retryMsg.setWorkflowId(workflowId);
-            retryMsg.setPayload((String) payload);
-            retryMsg.setAttempt(attempt);
+                WorkflowJobMessage retryMsg = new WorkflowJobMessage();
+                retryMsg.setRunId(runId);
+                retryMsg.setWorkflowId(workflowId);
+                retryMsg.setPayload((String) payload);
+                retryMsg.setAttempt(attempt);
 
-            String retryQueue = resolveRetryQueue(attempt);
+                String retryQueue = resolveRetryQueue(attempt);
+
+                rabbitTemplate.convertAndSend(
+                        "",
+                        retryQueue,
+                        retryMsg
+                );
+
+                metrics.runsRetried.increment();
+
+                return;
+            }
+
+            workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+            workflowRunRepository.markDeadLettered(runId);
+            metrics.runsFailed.increment();
+            metrics.runsDeadLettered.increment();
+
+            WorkflowDlqMessage dlqMsg = new WorkflowDlqMessage();
+            dlqMsg.setRunId(runId);
+            dlqMsg.setWorkflowId(workflowId);
+            dlqMsg.setAttempt(run.getAttempt());
+            dlqMsg.setError(ex.getMessage());
+            dlqMsg.setFailedAt(OffsetDateTime.now());
 
             rabbitTemplate.convertAndSend(
                     "",
-                    retryQueue,
-                    retryMsg
+                    "workflow.tasks.dlq",
+                    dlqMsg
             );
-
-            metrics.runsRetried.increment();
-
-            return;
         }
-
-        workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
-        workflowRunRepository.markDeadLettered(runId);
-        metrics.runsFailed.increment();
-        metrics.runsDeadLettered.increment();
-
-        WorkflowDlqMessage dlqMsg = new WorkflowDlqMessage();
-        dlqMsg.setRunId(runId);
-        dlqMsg.setWorkflowId(workflowId);
-        dlqMsg.setAttempt(run.getAttempt());
-        dlqMsg.setError(ex.getMessage());
-        dlqMsg.setFailedAt(OffsetDateTime.now());
-
-        rabbitTemplate.convertAndSend(
-                "",
-                "workflow.tasks.dlq",
-                dlqMsg
-        );
-    }
 
     private String resolveRetryQueue(int attempt) {
 
