@@ -7,6 +7,7 @@ import com.workflow_worker.demo.engine.retry.RetryService;
 import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.service.WorkflowRunService;
+import com.workflow_worker.demo.service.WorkflowRunStepService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -14,18 +15,19 @@ import java.util.UUID;
 
 @Component
 public class WorkflowTaskConsumer {
-
+    private final WorkflowRunStepService stepService;
     private final DistributedLockService distributedLockService;
     private final RetryService retryService;
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunService workflowRunService;
 
     public WorkflowTaskConsumer(
-            DistributedLockService distributedLockService,
+            WorkflowRunStepService stepService, DistributedLockService distributedLockService,
             WorkflowRunService workflowRunService,
             RetryService retryService,
             WorkflowExecutor workflowExecutor
     ) {
+        this.stepService = stepService;
         this.distributedLockService = distributedLockService;
         this.workflowRunService = workflowRunService;
         this.retryService = retryService;
@@ -58,9 +60,15 @@ public class WorkflowTaskConsumer {
                 workflowRunService.transition(runId, WorkflowRun.Status.WAITING);
                 return;
             }
+            System.out.println("[CONSUMER] runId=" + runId + " outcome=" + outcome);
+            System.out.println("[CONSUMER] runId=" + runId + " hasFailed=" + stepService.hasFailedStep(runId));
 
-            // outcome == COMPLETED
-            workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
+            boolean hasFailed = stepService.hasFailedStep(runId);
+            if (hasFailed) {
+                workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+            } else {
+                workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
+            }
 
         } catch (Exception ex) {
             WorkflowRun latest = workflowRunService.getRun(runId);

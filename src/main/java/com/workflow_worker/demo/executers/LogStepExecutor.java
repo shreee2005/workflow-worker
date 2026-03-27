@@ -10,6 +10,11 @@ import java.util.Map;
 public class LogStepExecutor implements StepExecutor {
 
     @Override
+    public String getType() {
+        return "LOG";
+    }
+
+    @Override
     public String execute(
             StepDefinition step,
             String payload
