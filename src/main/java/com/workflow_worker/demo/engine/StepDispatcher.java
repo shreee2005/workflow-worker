@@ -17,7 +17,7 @@ public class StepDispatcher {
     public StepExecutionResult dispatch(StepDefinition step, String payload) {
         try {
             String type = normalize(step.getType());
-            StepExecutor executor = registry.get(type); // normalized type lookup
+            StepExecutor executor = registry.get(type);
             String output = executor.execute(step, payload);
             return StepExecutionResult.success(output);
         } catch (Exception ex) {

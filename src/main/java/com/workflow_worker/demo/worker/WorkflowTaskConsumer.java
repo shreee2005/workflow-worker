@@ -22,7 +22,8 @@ public class WorkflowTaskConsumer {
     private final WorkflowRunService workflowRunService;
 
     public WorkflowTaskConsumer(
-            WorkflowRunStepService stepService, DistributedLockService distributedLockService,
+            WorkflowRunStepService stepService,
+            DistributedLockService distributedLockService,
             WorkflowRunService workflowRunService,
             RetryService retryService,
             WorkflowExecutor workflowExecutor
@@ -45,9 +46,18 @@ public class WorkflowTaskConsumer {
         try {
             WorkflowRun run = workflowRunService.getRun(runId);
 
+            if (workflowVersionId == null) {
+                workflowVersionId = run.getWorkflowVersionId();
+            }
+
             if (run.getStatus() == WorkflowRun.Status.QUEUED ||
                     run.getStatus() == WorkflowRun.Status.RETRYING ||
                     run.getStatus() == WorkflowRun.Status.WAITING) {
+
+                if (run.getStatus() == WorkflowRun.Status.RETRYING) {
+                    stepService.resetFailedStepsForRetry(runId);
+                }
+
                 workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
             }
 
@@ -56,12 +66,9 @@ public class WorkflowTaskConsumer {
             );
 
             if (outcome == ExecutionOutcome.WAITING) {
-                // IMPORTANT: keep run consistent
                 workflowRunService.transition(runId, WorkflowRun.Status.WAITING);
                 return;
             }
-            System.out.println("[CONSUMER] runId=" + runId + " outcome=" + outcome);
-            System.out.println("[CONSUMER] runId=" + runId + " hasFailed=" + stepService.hasFailedStep(runId));
 
             boolean hasFailed = stepService.hasFailedStep(runId);
             if (hasFailed) {
@@ -73,10 +80,9 @@ public class WorkflowTaskConsumer {
         } catch (Exception ex) {
             WorkflowRun latest = workflowRunService.getRun(runId);
 
-            // never retry if already waiting
             if (latest.getStatus() == WorkflowRun.Status.WAITING) return;
 
-            retryService.handleFailure(runId, workflowId, message.getPayload(), ex);
+            retryService.handleFailure(runId, workflowId, workflowVersionId, message.getPayload(), ex);
         } finally {
             distributedLockService.release(runId);
         }

@@ -6,7 +6,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "workflow_runs")
-public class WorkflowRun{
+public class WorkflowRun {
 
     @Id
     @Column(nullable = false)
@@ -17,14 +17,6 @@ public class WorkflowRun{
 
     @Column(name = "workflow_version_id", nullable = false)
     private UUID workflowVersionId;
-
-    public UUID getWorkflowVersionId() {
-        return workflowVersionId;
-    }
-
-    public void setWorkflowVersionId(UUID workflowVersionId) {
-        this.workflowVersionId = workflowVersionId;
-    }
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -42,35 +34,11 @@ public class WorkflowRun{
     @Column(nullable = false)
     private int attempt = 0;
 
-    @Column(nullable = false)
+    @Column(name = "max_attempts", nullable = false)
     private int maxAttempts = 3;
 
-    @Column(nullable = false)
+    @Column(name = "dead_lettered", nullable = false)
     private boolean deadLettered = false;
-
-    public boolean isDeadLettered() {
-        return deadLettered; // Dead Lettered Flag Issue
-    }
-
-    public void setDeadLettered(boolean deadLettered) {
-        this.deadLettered = deadLettered;
-    }
-
-    public int getAttempt() {
-        return attempt;
-    }
-
-    public void setAttempt(int attempt) {
-        this.attempt = attempt;
-    }
-
-    public int getMaxAttempts() {
-        return maxAttempts;
-    }
-
-    public void setMaxAttempts(int maxAttempts) {
-        this.maxAttempts = maxAttempts;
-    }
 
     public enum Status {
         CREATED,
@@ -82,53 +50,33 @@ public class WorkflowRun{
         FAILED
     }
 
-    // ===== getters & setters =====
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public UUID getId() {
-        return id;
-    }
+    public UUID getWorkflowId() { return workflowId; }
+    public void setWorkflowId(UUID workflowId) { this.workflowId = workflowId; }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
+    public UUID getWorkflowVersionId() { return workflowVersionId; }
+    public void setWorkflowVersionId(UUID workflowVersionId) { this.workflowVersionId = workflowVersionId; }
 
-    public UUID getWorkflowId() {
-        return workflowId;
-    }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
 
-    public void setWorkflowId(UUID workflowId) {
-        this.workflowId = workflowId;
-    }
+    public OffsetDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
 
-    public Status getStatus() {
-        return status;
-    }
+    public OffsetDateTime getFinishedAt() { return finishedAt; }
+    public void setFinishedAt(OffsetDateTime finishedAt) { this.finishedAt = finishedAt; }
 
-    public void setStatus(Status status) {
-        this.status = status;
-    }
+    public String getErrorMessage() { return errorMessage; }
+    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
 
-    public OffsetDateTime getStartedAt() {
-        return startedAt;
-    }
+    public int getAttempt() { return attempt; }
+    public void setAttempt(int attempt) { this.attempt = attempt; }
 
-    public void setStartedAt(OffsetDateTime startedAt) {
-        this.startedAt = startedAt;
-    }
+    public int getMaxAttempts() { return maxAttempts; }
+    public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
 
-    public OffsetDateTime getFinishedAt() {
-        return finishedAt;
-    }
-
-    public void setFinishedAt(OffsetDateTime finishedAt) {
-        this.finishedAt = finishedAt;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
-    }
-
-    public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage;
-    }
+    public boolean isDeadLettered() { return deadLettered; }
+    public void setDeadLettered(boolean deadLettered) { this.deadLettered = deadLettered; }
 }

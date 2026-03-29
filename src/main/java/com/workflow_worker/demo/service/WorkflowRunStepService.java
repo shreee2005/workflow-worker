@@ -3,6 +3,7 @@ package com.workflow_worker.demo.service;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
 import com.workflow_worker.demo.repository.WorkflowRunStepRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -107,6 +108,17 @@ public class WorkflowRunStepService {
     public boolean hasFailedStep(UUID runId) {
         return repo.findByRunId(runId).stream()
                 .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
+    }
+
+    @Transactional
+    public void resetFailedStepsForRetry(UUID runId) {
+        List<WorkflowRunStep> steps = repo.findByRunId(runId);
+        for (WorkflowRunStep step : steps) {
+            if (step.getStatus() == WorkflowRunStep.Status.FAILED) {
+                repo.delete(step);
+            }
+        }
+        repo.flush();
     }
 
     private void transition(
