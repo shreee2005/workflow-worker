@@ -5,9 +5,11 @@ import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.repository.WorkflowRunRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,117 +19,76 @@ public class WorkflowRunService {
     private final WorkflowRunRepository repo;
     private final ApplicationEventPublisher eventPublisher;
 
-    public WorkflowRunService(
-            WorkflowRunRepository repo,
-            ApplicationEventPublisher eventPublisher
-    ) {
+    public WorkflowRunService(WorkflowRunRepository repo, ApplicationEventPublisher eventPublisher) {
         this.repo = repo;
         this.eventPublisher = eventPublisher;
     }
 
+    public Optional<WorkflowRun> findRun(UUID runId) {
+        return repo.findById(runId);
+    }
+
     public WorkflowRun getRun(UUID runId) {
-        return repo.findById(runId).orElseThrow();
+        return repo.findById(runId).orElseThrow(() ->
+                new IllegalStateException("RUN_NOT_FOUND: " + runId));
     }
 
     public boolean canRetry(WorkflowRun run) {
         return run.getAttempt() < run.getMaxAttempts();
     }
 
+    @Transactional
     public void incrementAttempt(UUID runId) {
         WorkflowRun run = getRun(runId);
         run.setAttempt(run.getAttempt() + 1);
-        repo.save(run);
+        repo.saveAndFlush(run);
     }
 
+    @Transactional
     public void transition(UUID runId, WorkflowRun.Status target) {
-
         WorkflowRun run = getRun(runId);
         WorkflowRun.Status current = run.getStatus();
 
-        if (current == target) {
-            return;
-        }
+        if (current == target) return;
 
-        if (!ALLOWED_TRANSITIONS
-                .getOrDefault(current, Set.of())
-                .contains(target)) {
-
-            throw new IllegalStateException(
-                    "Invalid Transition " + current + " -> " + target
-            );
+        if (!ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(target)) {
+            throw new IllegalStateException("Invalid Transition " + current + " -> " + target);
         }
 
         run.setStatus(target);
 
-        if (target == WorkflowRun.Status.RUNNING) {
-
+        if (target == WorkflowRun.Status.RUNNING && run.getStartedAt() == null) {
             run.setStartedAt(OffsetDateTime.now());
-
-            eventPublisher.publishEvent(
-                    new WorkflowStartedEvent(runId, run.getWorkflowId())
-            );
+            eventPublisher.publishEvent(new WorkflowStartedEvent(runId, run.getWorkflowId()));
         }
 
         if (target == WorkflowRun.Status.RETRYING) {
-
-            eventPublisher.publishEvent(
-                    new WorkflowRetryEvent(runId, run.getAttempt())
-            );
+            eventPublisher.publishEvent(new WorkflowRetryEvent(runId, run.getAttempt()));
         }
 
         if (target == WorkflowRun.Status.SUCCEEDED) {
-
             run.setFinishedAt(OffsetDateTime.now());
-
-            eventPublisher.publishEvent(
-                    new WorkflowSucceededEvent(runId)
-            );
+            run.setErrorMessage(null);
+            eventPublisher.publishEvent(new WorkflowSucceededEvent(runId));
         }
 
         if (target == WorkflowRun.Status.FAILED) {
-
             run.setFinishedAt(OffsetDateTime.now());
-
-            eventPublisher.publishEvent(
-                    new WorkflowFailedEvent(runId, run.getErrorMessage())
-            );
+            if (run.getErrorMessage() == null) run.setErrorMessage("Workflow failed");
+            eventPublisher.publishEvent(new WorkflowFailedEvent(runId, run.getErrorMessage()));
         }
 
-
-        repo.save(run);
+        repo.saveAndFlush(run);
     }
 
     private static final Map<WorkflowRun.Status, Set<WorkflowRun.Status>> ALLOWED_TRANSITIONS =
             Map.of(
-                    WorkflowRun.Status.CREATED,
-                    Set.of(WorkflowRun.Status.QUEUED),
-
-                    WorkflowRun.Status.QUEUED,
-                    Set.of(WorkflowRun.Status.RUNNING),
-
-                    WorkflowRun.Status.RUNNING,
-                    Set.of(
-                            WorkflowRun.Status.RETRYING,
-                            WorkflowRun.Status.WAITING,
-                            WorkflowRun.Status.SUCCEEDED,
-                            WorkflowRun.Status.FAILED
-                    ),
-
-                    WorkflowRun.Status.WAITING,
-                    Set.of(
-                            WorkflowRun.Status.RUNNING
-                    ),
-                    WorkflowRun.Status.RETRYING,
-                    Set.of(
-                            WorkflowRun.Status.RUNNING,
-                            WorkflowRun.Status.WAITING,
-                            WorkflowRun.Status.FAILED
-                    ),
-
-                    WorkflowRun.Status.SUCCEEDED,
-                    Set.of(),
-
-                    WorkflowRun.Status.FAILED,
-                    Set.of()
+                    WorkflowRun.Status.CREATED, Set.of(WorkflowRun.Status.QUEUED),
+                    WorkflowRun.Status.QUEUED, Set.of(WorkflowRun.Status.RUNNING),
+                    WorkflowRun.Status.RUNNING, Set.of(WorkflowRun.Status.RETRYING, WorkflowRun.Status.WAITING, WorkflowRun.Status.SUCCEEDED, WorkflowRun.Status.FAILED),
+                    WorkflowRun.Status.WAITING, Set.of(WorkflowRun.Status.RUNNING),
+                    WorkflowRun.Status.RETRYING, Set.of(WorkflowRun.Status.RUNNING, WorkflowRun.Status.WAITING, WorkflowRun.Status.FAILED),
+                    WorkflowRun.Status.SUCCEEDED, Set.of(),
+                    WorkflowRun.Status.FAILED, Set.of()
             );
 }

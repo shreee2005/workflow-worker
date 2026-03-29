@@ -2,5 +2,7 @@ package com.workflow_worker.demo.engine;
 
 public enum ExecutionOutcome {
     COMPLETED,
-    WAITING
+    WAITING,
+    FAILED_RETRYABLE,
+    FAILED_NON_RETRYABLE
 }

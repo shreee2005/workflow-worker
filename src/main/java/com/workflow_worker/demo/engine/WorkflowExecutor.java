@@ -25,12 +25,13 @@ public class WorkflowExecutor {
     private final WorkflowRunStepService stepService;
     private final StepDispatcher dispatcher;
     private final WorkflowRunService workflowRunService;
-    public WorkflowExecutor(
 
+    public WorkflowExecutor(
             WorkflowVersionRepository workflowVersionRepository,
             WorkflowWaitStateRepository workflowWaitStateRepository,
             WorkflowRunStepService stepService,
-            StepDispatcher dispatcher, WorkflowRunService workflowRunService
+            StepDispatcher dispatcher,
+            WorkflowRunService workflowRunService
     ) {
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowWaitStateRepository = workflowWaitStateRepository;
@@ -55,28 +56,23 @@ public class WorkflowExecutor {
         List<StepDefinition> steps = WorkflowSpecParser.parse(wfVersion.getSpec());
         int nextStepIndex = stepService.getNextPendingStepIndex(runId);
         System.out.println("[EXECUTOR] runId=" + runId + " nextStepIndex=" + nextStepIndex);
-        if (nextStepIndex == Integer.MAX_VALUE) return ExecutionOutcome.WAITING; // blocked on callback
-        if (nextStepIndex == -1) return ExecutionOutcome.COMPLETED;              // terminal failed path
+        if (nextStepIndex == Integer.MAX_VALUE) return ExecutionOutcome.WAITING;
+        if (nextStepIndex == -1) return ExecutionOutcome.COMPLETED;
         if (nextStepIndex >= steps.size()) return ExecutionOutcome.COMPLETED;
 
         StepDefinition stepDef = steps.get(nextStepIndex);
         String stepType = normalize(stepDef.getType());
 
-        // ---- WAIT branch FIRST (no RUNNING row creation) ----
-        if ("WAIT_FOR_CALLBACK".equals(normalize(stepDef.getType()))) {
+        if ("WAIT_FOR_CALLBACK".equals(stepType)) {
             String correlationId = createWaitState(runId, workflowId, workflowVersionId, nextStepIndex, stepDef.getConfig());
 
-            // create explicit WAITING step row
             stepService.markStepWaiting(runId, nextStepIndex, "WAIT_FOR_CALLBACK",
                     "Waiting for callback. correlationId=" + correlationId);
 
-            // set run WAITING HERE (not in consumer)
             workflowRunService.transition(runId, WorkflowRun.Status.WAITING);
-
             return ExecutionOutcome.WAITING;
         }
 
-        // ---- normal steps ----
         WorkflowRunStep step = stepService.startStep(runId, nextStepIndex, stepType);
         StepExecutionResult result = dispatcher.dispatch(stepDef, payload);
 
@@ -86,7 +82,7 @@ public class WorkflowExecutor {
         }
 
         stepService.failStep(step, result.getError());
-        return ExecutionOutcome.COMPLETED;
+        throw new RuntimeException(result.getError() == null ? "Step execution failed" : result.getError());
     }
 
     private String createWaitState(

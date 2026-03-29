@@ -1,13 +1,14 @@
 package com.workflow_worker.demo.engine;
 
 public class StepExecutionResult {
-    public enum Status{
+    public enum Status {
         SUCCESS,
         FAILED
     }
 
     private Status status;
     private String output;
+    private String error;
 
     public Status getStatus() {
         return status;
@@ -21,21 +22,17 @@ public class StepExecutionResult {
         return error;
     }
 
-    private String error;
-
-    public static StepExecutionResult success(String output){
+    public static StepExecutionResult success(String output) {
         StepExecutionResult r = new StepExecutionResult();
         r.status = Status.SUCCESS;
         r.output = output;
         return r;
     }
 
-    public static StepExecutionResult failure(String error){
+    public static StepExecutionResult failure(String error) {
         StepExecutionResult r = new StepExecutionResult();
         r.status = Status.FAILED;
         r.error = error;
         return r;
     }
-
-
 }
