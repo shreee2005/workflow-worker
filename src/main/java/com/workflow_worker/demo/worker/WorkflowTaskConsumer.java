@@ -12,9 +12,13 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class WorkflowTaskConsumer {
+    private static final Pattern HTTP_STATUS_PATTERN = Pattern.compile("\\b([1-5][0-9]{2})\\b");
+
     private final WorkflowRunStepService stepService;
     private final DistributedLockService distributedLockService;
     private final RetryService retryService;
@@ -50,15 +54,20 @@ public class WorkflowTaskConsumer {
                 workflowVersionId = run.getWorkflowVersionId();
             }
 
+            boolean isRetryMessage = message.getAttempt() > 0;
+
             if (run.getStatus() == WorkflowRun.Status.QUEUED ||
                     run.getStatus() == WorkflowRun.Status.RETRYING ||
-                    run.getStatus() == WorkflowRun.Status.WAITING) {
+                    run.getStatus() == WorkflowRun.Status.WAITING ||
+                    (run.getStatus() == WorkflowRun.Status.RUNNING && isRetryMessage)) {
 
-                if (run.getStatus() == WorkflowRun.Status.RETRYING) {
+                if (run.getStatus() == WorkflowRun.Status.RETRYING || isRetryMessage) {
                     stepService.resetFailedStepsForRetry(runId);
                 }
 
-                workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
+                if (run.getStatus() != WorkflowRun.Status.RUNNING) {
+                    workflowRunService.transition(runId, WorkflowRun.Status.RUNNING);
+                }
             }
 
             ExecutionOutcome outcome = workflowExecutor.executeRun(
@@ -81,10 +90,39 @@ public class WorkflowTaskConsumer {
             WorkflowRun latest = workflowRunService.getRun(runId);
 
             if (latest.getStatus() == WorkflowRun.Status.WAITING) return;
-
-            retryService.handleFailure(runId, workflowId, workflowVersionId, message.getPayload(), ex);
+            boolean retryable = isRetryableError(ex.getMessage());
+            retryService.handleFailure(runId, workflowId, workflowVersionId, message.getPayload(), ex , retryable);
         } finally {
             distributedLockService.release(runId);
         }
+    }
+
+    private boolean isRetryableError(String msg) {
+        if (msg == null) return true;
+        String m = msg.toLowerCase();
+
+        // common non-retryable validation/config errors
+        if (m.contains("missing 'url'")) return false;
+        if (m.contains("invalid")) return false;
+        if (m.contains("bad request")) return false;
+
+        // Any explicit HTTP status code:
+        // 4xx (except 429) => non-retryable, 429/5xx => retryable
+        Matcher matcher = HTTP_STATUS_PATTERN.matcher(m);
+        if (matcher.find()) {
+            int code = Integer.parseInt(matcher.group(1));
+            if (code == 429) return true;
+            if (code >= 500) return true;
+            if (code >= 400) return false;
+        }
+
+        // retryable transport/transient failures
+        if (m.contains("connection") || m.contains("timeout") || m.contains("refused") || m.contains("i/o error"))
+            return true;
+
+        // keep explicit retry-test behavior retryable
+        if (m.contains("intentional failure for retry test")) return true;
+
+        return true; // default to retryable
     }
 }

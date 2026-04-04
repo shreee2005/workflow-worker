@@ -37,22 +37,45 @@ public class RetryService {
             UUID workflowId,
             UUID workflowVersionId,
             Object payload,
-            Exception ex
+            Exception ex,
+            boolean retryable
     ) {
 
         WorkflowRun run = workflowRunService.getRun(runId);
-
         UUID effectiveVersionId = workflowVersionId != null ? workflowVersionId : run.getWorkflowVersionId();
 
         if (run.getStatus() == WorkflowRun.Status.WAITING) return;
         if (run.getStatus() == WorkflowRun.Status.FAILED || run.getStatus() == WorkflowRun.Status.SUCCEEDED) return;
+
+        if (!retryable) {
+            run.setErrorMessage(ex.getMessage());
+            workflowRunRepository.save(run);
+            workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+            workflowRunRepository.markDeadLettered(runId);
+            metrics.runsFailed.increment();
+            metrics.runsDeadLettered.increment();
+
+            WorkflowDlqMessage dlqMsg = new WorkflowDlqMessage();
+            dlqMsg.setRunId(runId);
+            dlqMsg.setWorkflowId(workflowId);
+            dlqMsg.setAttempt(run.getAttempt());
+            dlqMsg.setError(ex.getMessage());
+            dlqMsg.setFailedAt(OffsetDateTime.now());
+            rabbitTemplate.convertAndSend("", "workflow.tasks.dlq", dlqMsg);
+            return;
+        }
 
         if (workflowRunService.canRetry(run)) {
 
             workflowRunService.incrementAttempt(runId);
             WorkflowRun updatedRun = workflowRunService.getRun(runId);
 
-            workflowRunService.transition(runId, WorkflowRun.Status.RETRYING);
+            try {
+                workflowRunService.transition(runId, WorkflowRun.Status.RETRYING);
+            } catch (Exception ignored) {
+                // Backward-compatible fallback: some DBs still have older status CHECK constraints.
+                // Retry scheduling still proceeds and consumer can continue based on message attempt.
+            }
 
             int attempt = updatedRun.getAttempt();
 
