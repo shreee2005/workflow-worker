@@ -2,6 +2,9 @@ package com.workflow_worker.demo.executers;
 
 import com.workflow_worker.demo.worker.StepExecutor;
 import com.workflow_worker.demo.workflow.StepDefinition;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -21,6 +24,7 @@ public class HttpCallStepExecutor implements StepExecutor {
     }
 
     @Override
+    @WithSpan("step.http_call")
     public String execute(StepDefinition step, String payload) {
         Map<String, Object> config = step.getConfig();
 
@@ -31,6 +35,10 @@ public class HttpCallStepExecutor implements StepExecutor {
         String url = String.valueOf(config.get("url")).trim();
         String method = config.get("method") == null ? "POST" : String.valueOf(config.get("method")).trim().toUpperCase();
 
+        Span currentSpan = Span.current();
+        currentSpan.setAttribute("http.url", url);
+        currentSpan.setAttribute("http.method", method);
+
         try {
             HttpMethod httpMethod = HttpMethod.valueOf(method);
 
@@ -40,6 +48,8 @@ public class HttpCallStepExecutor implements StepExecutor {
             HttpEntity<String> req = new HttpEntity<>(payload == null ? "{}" : payload, headers);
             ResponseEntity<String> res = restTemplate.exchange(url, httpMethod, req, String.class);
 
+            currentSpan.setAttribute("http.status_code", res.getStatusCode().value());
+
             if (!res.getStatusCode().is2xxSuccessful()) {
                 throw new RuntimeException("HTTP_CALL non-2xx status: " + res.getStatusCode().value());
             }
@@ -47,10 +57,17 @@ public class HttpCallStepExecutor implements StepExecutor {
             return res.getBody() == null ? "HTTP_CALL_SUCCESS" : res.getBody();
 
         } catch (ResourceAccessException e) {
+            currentSpan.recordException(e);
+            currentSpan.setAttribute("error.type", "connection");
             throw new RuntimeException("HTTP_CALL connection error: " + e.getMessage(), e);
         } catch (HttpStatusCodeException e) {
+            currentSpan.recordException(e);
+            currentSpan.setAttribute("error.type", "http_status");
+            currentSpan.setAttribute("http.status_code", e.getStatusCode().value());
             throw new RuntimeException("HTTP_CALL status error: " + e.getStatusCode().value(), e);
         } catch (Exception e) {
+            currentSpan.recordException(e);
+            currentSpan.setAttribute("error.type", "unknown");
             throw new RuntimeException("HTTP_CALL failed: " + e.getMessage(), e);
         }
     }
