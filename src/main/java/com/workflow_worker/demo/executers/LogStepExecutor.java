@@ -2,6 +2,8 @@ package com.workflow_worker.demo.executers;
 
 import com.workflow_worker.demo.worker.StepExecutor;
 import com.workflow_worker.demo.workflow.StepDefinition;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -15,6 +17,7 @@ public class LogStepExecutor implements StepExecutor {
     }
 
     @Override
+    @WithSpan("step.log")
     public String execute(
             StepDefinition step,
             String payload
@@ -28,6 +31,9 @@ public class LogStepExecutor implements StepExecutor {
             message = config.get("message").toString();
         }
 
+        Span currentSpan = Span.current();
+        currentSpan.setAttribute("log.message", message);
+
         String logOutput =
                 "[LOG STEP] message=" + message +
                         " payload=" + payload;
@@ -40,6 +46,7 @@ public class LogStepExecutor implements StepExecutor {
         and RetryService will schedule retry.
         */
         if ("fail".equalsIgnoreCase(message)) {
+            currentSpan.setAttribute("step.forced_failure", true);
             throw new RuntimeException(
                     "Intentional failure for retry test"
             );

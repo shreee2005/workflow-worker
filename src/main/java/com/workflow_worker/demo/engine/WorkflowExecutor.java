@@ -10,6 +10,9 @@ import com.workflow_worker.demo.service.WorkflowRunService;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
 import com.workflow_worker.demo.workflow.StepDefinition;
 import com.workflow_worker.demo.workflow.WorkflowSpecParser;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -40,12 +43,15 @@ public class WorkflowExecutor {
         this.workflowRunService = workflowRunService;
     }
 
+    @WithSpan("workflow.execute")
     public ExecutionOutcome executeRun(
-            UUID runId,
-            UUID workflowId,
-            UUID workflowVersionId,
+            @SpanAttribute("run.id") UUID runId,
+            @SpanAttribute("workflow.id") UUID workflowId,
+            @SpanAttribute("workflow.version.id") UUID workflowVersionId,
             String payload
     ) {
+        Span currentSpan = Span.current();
+
         WorkflowVersion wfVersion = workflowVersionRepository.findById(workflowVersionId)
                 .orElseThrow(() -> new RuntimeException("Workflow version not found"));
 
@@ -54,7 +60,11 @@ public class WorkflowExecutor {
         }
 
         List<StepDefinition> steps = WorkflowSpecParser.parse(wfVersion.getSpec());
+        currentSpan.setAttribute("workflow.total.steps", steps.size());
+
         int nextStepIndex = stepService.getNextPendingStepIndex(runId);
+        currentSpan.setAttribute("workflow.next.step.index", nextStepIndex);
+
         System.out.println("[EXECUTOR] runId=" + runId + " nextStepIndex=" + nextStepIndex);
         if (nextStepIndex == Integer.MAX_VALUE) return ExecutionOutcome.WAITING;
         if (nextStepIndex == -1) return ExecutionOutcome.COMPLETED;
@@ -62,6 +72,8 @@ public class WorkflowExecutor {
 
         StepDefinition stepDef = steps.get(nextStepIndex);
         String stepType = normalize(stepDef.getType());
+        currentSpan.setAttribute("step.type", stepType);
+        currentSpan.setAttribute("step.index", nextStepIndex);
 
         if ("WAIT_FOR_CALLBACK".equals(stepType)) {
             String correlationId = createWaitState(runId, workflowId, workflowVersionId, nextStepIndex, stepDef.getConfig());

@@ -8,6 +8,9 @@ import com.workflow_worker.demo.entity.WorkflowRun;
 import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.service.WorkflowRunService;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -40,15 +43,26 @@ public class WorkflowTaskConsumer {
     }
 
     @RabbitListener(queues = "workflow.tasks", containerFactory = "rabbitListenerContainerFactory")
+    @WithSpan("queue.consume")
     public void handleTask(WorkflowJobMessage message) {
         UUID runId = message.getRunId();
         UUID workflowId = message.getWorkflowId();
         UUID workflowVersionId = message.getWorkflowVersionId();
 
-        if (!distributedLockService.acquire(runId)) return;
+        Span currentSpan = Span.current();
+        currentSpan.setAttribute("run.id", runId.toString());
+        currentSpan.setAttribute("workflow.id", workflowId.toString());
+        currentSpan.setAttribute("message.attempt", message.getAttempt());
+
+        if (!distributedLockService.acquire(runId)) {
+            currentSpan.setAttribute("lock.acquired", false);
+            return;
+        }
+        currentSpan.setAttribute("lock.acquired", true);
 
         try {
             WorkflowRun run = workflowRunService.getRun(runId);
+            currentSpan.setAttribute("run.status.before", run.getStatus().toString());
 
             if (workflowVersionId == null) {
                 workflowVersionId = run.getWorkflowVersionId();
@@ -73,20 +87,25 @@ public class WorkflowTaskConsumer {
             ExecutionOutcome outcome = workflowExecutor.executeRun(
                     runId, workflowId, workflowVersionId, message.getPayload()
             );
+            currentSpan.setAttribute("execution.outcome", outcome.toString());
 
             if (outcome == ExecutionOutcome.WAITING) {
                 workflowRunService.transition(runId, WorkflowRun.Status.WAITING);
+                currentSpan.setAttribute("run.status.after", "WAITING");
                 return;
             }
 
             boolean hasFailed = stepService.hasFailedStep(runId);
             if (hasFailed) {
                 workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
+                currentSpan.setAttribute("run.status.after", "FAILED");
             } else {
                 workflowRunService.transition(runId, WorkflowRun.Status.SUCCEEDED);
+                currentSpan.setAttribute("run.status.after", "SUCCEEDED");
             }
 
         } catch (Exception ex) {
+            currentSpan.recordException(ex);
             WorkflowRun latest = workflowRunService.getRun(runId);
 
             if (latest.getStatus() == WorkflowRun.Status.WAITING) return;

@@ -10,5 +10,7 @@ RUN mvn -B -e -DskipTests package
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+COPY docker/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
