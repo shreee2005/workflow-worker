@@ -1,0 +1,40 @@
+{
+  "name": "Parallel Data Pipeline",
+  "description": "Fetch user data and posts in parallel",
+  "steps": [
+    {
+      "type": "HTTP_CALL",
+      "name": "fetch_user",
+      "config": {
+        "url": "https://jsonplaceholder.typicode.com/users/1",
+        "method": "GET"
+      }
+    },
+    {
+      "type": "HTTP_CALL",
+      "name": "fetch_posts",
+      "config": {
+        "url": "https://jsonplaceholder.typicode.com/posts?userId=1",
+        "method": "GET",
+        "dependsOn": []
+      }
+    },
+    {
+      "type": "HTTP_CALL",
+      "name": "fetch_comments",
+      "config": {
+        "url": "https://jsonplaceholder.typicode.com/comments?postId=1",
+        "method": "GET",
+        "dependsOn": [1]
+      }
+    },
+    {
+      "type": "LOG",
+      "name": "final_log",
+      "config": {
+        "message": "Pipeline complete. User: ${steps[0].output.name}, Posts: ${steps[1].output}",
+        "dependsOn": [0, 1, 2]
+      }
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+package com.workflow_worker.demo.dag;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+
+/**
+ * Runtime execution context for a workflow run.
+ * Tracks step outputs, variables, and runtime state for variable interpolation.
+ *
+ * Usage:
+ * context.setStepOutput(0, "{\"result\": \"value\"}");
+ * String resolved = context.resolveVariables("${steps[0].output}");
+ */
+public class WorkflowContext {
+    private final UUID runId;
+    private final Map<Integer, String> stepOutputs;  // stepIndex -> JSON string
+    private final Map<String, Object> variables;
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public WorkflowContext(UUID runId) {
+        this.runId = runId;
+        this.stepOutputs = new HashMap<>();
+        this.variables = new HashMap<>();
+    }
+
+    public UUID getRunId() {
+        return runId;
+    }
+
+    /**
+     * Store output from a completed step.
+     */
+    public void setStepOutput(int stepIndex, String jsonOutput) {
+        if (jsonOutput != null && !jsonOutput.isBlank()) {
+            stepOutputs.put(stepIndex, jsonOutput);
+        }
+    }
+
+    /**
+     * Get output from a step (as JSON string).
+     */
+    public String getStepOutput(int stepIndex) {
+        return stepOutputs.getOrDefault(stepIndex, null);
+    }
+
+    /**
+     * Get output parsed as Map (convenience method).
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getStepOutputAsMap(int stepIndex) {
+        String output = getStepOutput(stepIndex);
+        if (output == null) {
+            return new HashMap<>();
+        }
+        try {
+            Object parsed = mapper.readValue(output, Object.class);
+            return parsed instanceof Map ? (Map<String, Object>) parsed : new HashMap<>();
+        } catch (Exception e) {
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * Set a runtime variable.
+     */
+    public void setVariable(String key, Object value) {
+        variables.put(key, value);
+    }
+
+    /**
+     * Get a runtime variable.
+     */
+    public Object getVariable(String key) {
+        return variables.get(key);
+    }
+
+    /**
+     * Check if a step has completed (has output).
+     */
+    public boolean isStepCompleted(int stepIndex) {
+        return stepOutputs.containsKey(stepIndex);
+    }
+
+    /**
+     * Get all completed step indices.
+     */
+    public Set<Integer> getCompletedStepIndices() {
+        return new HashSet<>(stepOutputs.keySet());
+    }
+
+    /**
+     * Clear (reset) all outputs and variables.
+     */
+    public void clear() {
+        stepOutputs.clear();
+        variables.clear();
+    }
+}

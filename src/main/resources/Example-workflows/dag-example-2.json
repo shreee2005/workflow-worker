@@ -1,0 +1,44 @@
+{
+  "name": "Conditional Processing",
+  "description": "Process data through validation then transformation",
+  "steps": [
+    {
+      "type": "HTTP_CALL",
+      "name": "validate_data",
+      "config": {
+        "url": "https://api.example.com/validate",
+        "method": "POST",
+        "body": "{\"data\": \"input\"}"
+      }
+    },
+    {
+      "type": "HTTP_CALL",
+      "name": "transform_a",
+      "config": {
+        "url": "https://api.example.com/transform",
+        "method": "POST",
+        "body": "${steps[0].output}",
+        "dependsOn": [0]
+      }
+    },
+    {
+      "type": "HTTP_CALL",
+      "name": "transform_b",
+      "config": {
+        "url": "https://api.example.com/transform",
+        "method": "POST",
+        "body": "${steps[0].output}",
+        "dependsOn": [0]
+      }
+    },
+    {
+      "type": "HTTP_CALL",
+      "name": "aggregate",
+      "config": {
+        "url": "https://api.example.com/aggregate",
+        "method": "POST",
+        "dependsOn": [1, 2]
+      }
+    }
+  ]
+}

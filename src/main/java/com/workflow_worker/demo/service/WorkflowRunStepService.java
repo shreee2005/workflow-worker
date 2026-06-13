@@ -1,5 +1,6 @@
 package com.workflow_worker.demo.service;
 
+import com.workflow_worker.demo.dag.WorkflowContext;
 import com.workflow_worker.demo.entity.WorkflowRunStep;
 import com.workflow_worker.demo.repository.WorkflowRunStepRepository;
 import org.springframework.stereotype.Service;
@@ -34,12 +35,16 @@ public class WorkflowRunStepService {
     }
 
     public void succeedStep(WorkflowRunStep step, String logs) {
+        succeedStep(step, logs, null);
+    }
 
+    public void succeedStep(WorkflowRunStep step, String logs, String output) {
         transition(step, WorkflowRunStep.Status.SUCCEEDED);
-
         step.setFinishedAt(OffsetDateTime.now());
         step.setLogs(logs);
-
+        if (output != null) {
+            step.setOutput(output);
+        }
         repo.save(step);
     }
 
@@ -53,13 +58,6 @@ public class WorkflowRunStepService {
         repo.save(step);
     }
 
-    /**
-     * Determines which step should run next.
-     *
-     * Logic:
-     * 1. If a step FAILED → retry that step
-     * 2. Otherwise run the next index after the last succeeded step
-     */
     public WorkflowRunStep markStepWaiting(UUID runId, int stepIndex, String stepType, String logs) {
         WorkflowRunStep step = new WorkflowRunStep();
         step.setId(UUID.randomUUID());
@@ -119,6 +117,30 @@ public class WorkflowRunStepService {
             }
         }
         repo.flush();
+    }
+
+    public WorkflowContext buildContextFromSteps(UUID runId) {
+        WorkflowContext context = new WorkflowContext(runId);
+
+        List<WorkflowRunStep> steps = repo.findByRunIdOrderByStepIndexAsc(runId);
+        for (WorkflowRunStep step : steps) {
+            if (step.getStatus() == WorkflowRunStep.Status.SUCCEEDED && step.getOutput() != null) {
+                context.setStepOutput(step.getStepIndex(), step.getOutput());
+            }
+        }
+
+        return context;
+    }
+
+    public WorkflowRunStep getStepByRunAndIndex(UUID runId, int stepIndex) {
+        return repo.findByRunId(runId).stream()
+                .filter(s -> s.getStepIndex() == stepIndex)
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<WorkflowRunStep> getStepsForRun(UUID runId) {
+        return repo.findByRunIdOrderByStepIndexAsc(runId);
     }
 
     private void transition(

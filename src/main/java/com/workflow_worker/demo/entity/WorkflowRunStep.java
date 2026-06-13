@@ -37,6 +37,10 @@ public class WorkflowRunStep {
     @Column(name = "error_message", columnDefinition = "text")
     private String errorMessage;
 
+    @Column(name = "output", columnDefinition = "text")
+    private String output;
+
+
     public enum Status {
         PENDING,
         WAITING,
@@ -115,5 +119,12 @@ public class WorkflowRunStep {
 
     public void setRunId(UUID runId) {
         this.runId = runId;
+    }
+    public String getOutput() {
+        return output;
+    }
+
+    public void setOutput(String output) {
+        this.output = output;
     }
 }
