@@ -1,5 +1,7 @@
 package com.workflow_worker.demo.workflow;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 public class StepDefinition {
@@ -7,6 +9,15 @@ public class StepDefinition {
     private String type;
     private String name;
     private Map<String, Object> config;
+
+    /**
+     * First-class dependency list: which step indices this step must wait for
+     * before it can execute. Kept separate from executor config so that
+     * executors (HTTP, LOG, etc.) never see workflow-control fields in their
+     * config map.
+     */
+    private List<Integer> dependsOn = Collections.emptyList();
+
     public StepDefinition() {}
 
     public StepDefinition(String type, Map<String, Object> config) {
@@ -44,12 +55,20 @@ public class StepDefinition {
         this.config = config;
     }
 
+    public List<Integer> getDependsOn() {
+        return dependsOn;
+    }
+
+    public void setDependsOn(List<Integer> dependsOn) {
+        this.dependsOn = dependsOn != null ? dependsOn : Collections.emptyList();
+    }
+
     @Override
     public String toString() {
         return "StepDefinition{" +
                 "type='" + type + '\'' +
-                "name='" + name + '\'' +
+                ", name='" + name + '\'' +
+                ", dependsOn=" + dependsOn +
                 '}';
     }
-
 }

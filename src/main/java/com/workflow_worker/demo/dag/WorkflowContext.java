@@ -2,6 +2,7 @@ package com.workflow_worker.demo.dag;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Runtime execution context for a workflow run.
@@ -13,14 +14,17 @@ import java.util.*;
  */
 public class WorkflowContext {
     private final UUID runId;
+    // ConcurrentHashMap: parallel steps in the same stage write their outputs
+    // from different threads simultaneously. A plain HashMap would cause silent
+    // data corruption or ConcurrentModificationException under real parallel load.
     private final Map<Integer, String> stepOutputs;  // stepIndex -> JSON string
     private final Map<String, Object> variables;
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public WorkflowContext(UUID runId) {
         this.runId = runId;
-        this.stepOutputs = new HashMap<>();
-        this.variables = new HashMap<>();
+        this.stepOutputs = new ConcurrentHashMap<>();
+        this.variables = new ConcurrentHashMap<>();
     }
 
     public UUID getRunId() {

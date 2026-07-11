@@ -19,13 +19,13 @@ public class DagParserTest {
         List<StepDefinition> steps = new ArrayList<>();
         steps.add(new StepDefinition("HTTP_CALL", Collections.emptyMap()));
 
-        Map<String, Object> step1Config = new HashMap<>();
-        step1Config.put("dependsOn", List.of(0));
-        steps.add(new StepDefinition("HTTP_CALL", step1Config));
+        StepDefinition step1 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        step1.setDependsOn(List.of(0));
+        steps.add(step1);
 
-        Map<String, Object> step2Config = new HashMap<>();
-        step2Config.put("dependsOn", List.of(1));
-        steps.add(new StepDefinition("HTTP_CALL", step2Config));
+        StepDefinition step2 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        step2.setDependsOn(List.of(1));
+        steps.add(step2);
 
         ExecutionPlan plan = DagParser.parse(steps);
 
@@ -44,17 +44,17 @@ public class DagParserTest {
         List<StepDefinition> steps = new ArrayList<>();
         steps.add(new StepDefinition("HTTP_CALL", Collections.emptyMap()));
 
-        Map<String, Object> step1Config = new HashMap<>();
-        step1Config.put("dependsOn", List.of(0));
-        steps.add(new StepDefinition("HTTP_CALL", step1Config));
+        StepDefinition step1 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        step1.setDependsOn(List.of(0));
+        steps.add(step1);
 
-        Map<String, Object> step2Config = new HashMap<>();
-        step2Config.put("dependsOn", List.of(0));
-        steps.add(new StepDefinition("HTTP_CALL", step2Config));
+        StepDefinition step2 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        step2.setDependsOn(List.of(0));
+        steps.add(step2);
 
-        Map<String, Object> step3Config = new HashMap<>();
-        step3Config.put("dependsOn", List.of(1, 2));
-        steps.add(new StepDefinition("HTTP_CALL", step3Config));
+        StepDefinition step3 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        step3.setDependsOn(List.of(1, 2));
+        steps.add(step3);
 
         ExecutionPlan plan = DagParser.parse(steps);
 
@@ -149,21 +149,21 @@ public class DagParserTest {
         List<StepDefinition> steps = new ArrayList<>();
         steps.add(new StepDefinition("HTTP_CALL", Collections.emptyMap()));  // 0: no deps
 
-        Map<String, Object> s1 = new HashMap<>();
-        s1.put("dependsOn", List.of(0));
-        steps.add(new StepDefinition("HTTP_CALL", s1));  // 1: depends on 0
+        StepDefinition s1 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        s1.setDependsOn(List.of(0));
+        steps.add(s1);  // 1: depends on 0
 
-        Map<String, Object> s2 = new HashMap<>();
-        s2.put("dependsOn", List.of(0));
-        steps.add(new StepDefinition("HTTP_CALL", s2));  // 2: depends on 0
+        StepDefinition s2 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        s2.setDependsOn(List.of(0));
+        steps.add(s2);  // 2: depends on 0
 
-        Map<String, Object> s3 = new HashMap<>();
-        s3.put("dependsOn", List.of(2));
-        steps.add(new StepDefinition("HTTP_CALL", s3));  // 3: depends on 2
+        StepDefinition s3 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        s3.setDependsOn(List.of(2));
+        steps.add(s3);  // 3: depends on 2
 
-        Map<String, Object> s4 = new HashMap<>();
-        s4.put("dependsOn", List.of(1, 3));
-        steps.add(new StepDefinition("HTTP_CALL", s4));  // 4: depends on 1,3
+        StepDefinition s4 = new StepDefinition("HTTP_CALL", Collections.emptyMap());
+        s4.setDependsOn(List.of(1, 3));
+        steps.add(s4);  // 4: depends on 1,3
 
         ExecutionPlan plan = DagParser.parse(steps);
 

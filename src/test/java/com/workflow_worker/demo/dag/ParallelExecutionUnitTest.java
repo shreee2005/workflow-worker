@@ -250,9 +250,9 @@ class ParallelExecutionUnitTest {
         steps.add(new StepDefinition("LOG", Collections.emptyMap()));
 
         for (int i = 1; i < 10; i++) {
-            Map<String, Object> config = new HashMap<>();
-            config.put("dependsOn", List.of(0));
-            steps.add(new StepDefinition("LOG", config));
+            StepDefinition s = new StepDefinition("LOG", Collections.emptyMap());
+            s.setDependsOn(List.of(0));
+            steps.add(s);
         }
 
         long start = System.currentTimeMillis();

@@ -15,25 +15,24 @@
       "name": "fetch_posts",
       "config": {
         "url": "https://jsonplaceholder.typicode.com/posts?userId=1",
-        "method": "GET",
-        "dependsOn": []
+        "method": "GET"
       }
     },
     {
       "type": "HTTP_CALL",
       "name": "fetch_comments",
+      "dependsOn": [1],
       "config": {
         "url": "https://jsonplaceholder.typicode.com/comments?postId=1",
-        "method": "GET",
-        "dependsOn": [1]
+        "method": "GET"
       }
     },
     {
       "type": "LOG",
       "name": "final_log",
+      "dependsOn": [0, 1, 2],
       "config": {
-        "message": "Pipeline complete. User: ${steps[0].output.name}, Posts: ${steps[1].output}",
-        "dependsOn": [0, 1, 2]
+        "message": "Pipeline complete. User: ${steps[0].output.name}, Posts: ${steps[1].output}"
       }
     }
   ]

@@ -71,38 +71,6 @@ public class WorkflowRunStepService {
         return repo.save(step);
     }
 
-    public int getNextPendingStepIndex(UUID runId) {
-        List<WorkflowRunStep> existing = repo.findByRunId(runId);
-
-        if (existing.isEmpty()) {
-            return 0;
-        }
-
-        // hard block on WAITING (external callback needed)
-        boolean hasWaiting = existing.stream()
-                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.WAITING);
-
-        if (hasWaiting) {
-            return Integer.MAX_VALUE; // means WAITING
-        }
-
-        // if any FAILED exists, treat as terminal (no next step to run)
-        boolean hasFailed = existing.stream()
-                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
-
-        if (hasFailed) {
-            return -1; // means FAILED terminal
-        }
-
-        int maxSucceeded = existing.stream()
-                .filter(s -> s.getStatus() == WorkflowRunStep.Status.SUCCEEDED)
-                .map(WorkflowRunStep::getStepIndex)
-                .max(Comparator.naturalOrder())
-                .orElse(-1);
-
-        return maxSucceeded + 1;
-    }
-
     public boolean hasFailedStep(UUID runId) {
         return repo.findByRunId(runId).stream()
                 .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
