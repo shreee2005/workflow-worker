@@ -66,7 +66,7 @@ public class WorkflowExecutor {
             List<StepDefinition> steps = parseWorkflowSpec(wfVersion.getSpec());
             currentSpan.setAttribute("workflow.total.steps", steps.size());
 
-            // Build execution plan from DAG (THIS WAS THE BUG - now fixed)
+            // Build execution plan from DAG
             ExecutionPlan executionPlan = DagParser.parse(steps);
             currentSpan.setAttribute("workflow.stages", executionPlan.getStageCount());
 
@@ -90,7 +90,6 @@ public class WorkflowExecutor {
 
     /**
      * Parse workflow spec JSON string into StepDefinition list.
-     * Safe wrapper around WorkflowSpecParser.
      */
     private List<StepDefinition> parseWorkflowSpec(String specJson) {
         if (specJson == null || specJson.isBlank()) {
@@ -130,7 +129,6 @@ public class WorkflowExecutor {
         for (int stageIndex = startStageIndex; stageIndex < stages.size(); stageIndex++) {
             ExecutionStage stage = stages.get(stageIndex);
 
-            // Set span attributes for this stage (don't create child spans - just use attributes)
             span.setAttribute("stage.number", stageIndex);
             span.setAttribute("stage.step_count", stage.getStepCount());
             span.setAttribute("stage.parallel", stage.isParallel());
@@ -147,8 +145,6 @@ public class WorkflowExecutor {
                 }
 
                 span.setAttribute("stage.status", "completed");
-                // If any step in stage failed, continue to next stage
-                // (failure is caught at workflow level)
             } catch (Exception ex) {
                 span.recordException(ex);
                 span.setAttribute("stage.status", "failed");
@@ -162,7 +158,7 @@ public class WorkflowExecutor {
 
     /**
      * Find the first stage that hasn't been completed yet.
-     * A stage is complete if all its steps are in SUCCEEDED or FAILED status.
+     * A stage is complete if all its steps are in SUCCEEDED, FAILED, or WAITING status.
      */
     private int findFirstIncompleteStage(UUID runId, ExecutionPlan executionPlan) {
         List<ExecutionStage> stages = executionPlan.getStages();
@@ -186,7 +182,7 @@ public class WorkflowExecutor {
     }
 
     /**
-     * Execute a single stage (all steps in parallel).
+     * Execute a single stage (all steps in parallel via CompletableFuture).
      */
     private ExecutionOutcome executeStage(
             UUID runId,
@@ -203,7 +199,7 @@ public class WorkflowExecutor {
             return ExecutionOutcome.COMPLETED;
         }
 
-        // Check if any step is already running/completed in this stage
+        // Skip steps already in a terminal/waiting state
         List<WorkflowRunStep> existingSteps = stepService.getStepsForRun(runId);
         Set<Integer> alreadyExecutedInStage = stepIndices.stream()
                 .filter(idx -> existingSteps.stream()
@@ -214,24 +210,21 @@ public class WorkflowExecutor {
                                         s.getStatus() == WorkflowRunStep.Status.RUNNING)))
                 .collect(Collectors.toSet());
 
-        // Execute remaining steps in parallel
         List<Integer> stepsToExecute = stepIndices.stream()
                 .filter(idx -> !alreadyExecutedInStage.contains(idx))
                 .toList();
 
         if (stepsToExecute.isEmpty()) {
-            // All steps in this stage already executed, check results
             return checkStageResults(runId, stepIndices);
         }
 
-        // Execute in parallel using CompletableFuture
+        // Execute remaining steps in parallel
         List<CompletableFuture<StepExecutionResult>> futures = stepsToExecute.stream()
                 .map(stepIndex -> CompletableFuture.supplyAsync(() ->
                         executeStep(runId, workflowId, workflowVersionId, stepIndex, steps, context, payload)
                 ))
                 .toList();
 
-        // Wait for all steps to complete (with timeout)
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(
                 futures.toArray(new CompletableFuture[0])
         );
@@ -244,13 +237,11 @@ public class WorkflowExecutor {
             throw new RuntimeException("Stage execution failed: " + e.getMessage(), e);
         }
 
-        // Check results of all steps in stage
         return checkStageResults(runId, stepIndices);
     }
 
     /**
-     * Execute a single step.
-     * Resolves variables, dispatches to executor, stores output.
+     * Execute a single step: resolve variables, dispatch, store output.
      */
     private StepExecutionResult executeStep(
             UUID runId,
@@ -265,7 +256,7 @@ public class WorkflowExecutor {
             StepDefinition stepDef = steps.get(stepIndex);
             String stepType = normalize(stepDef.getType());
 
-            // Check for WAIT_FOR_CALLBACK
+            // Handle WAIT_FOR_CALLBACK before creating a step record
             if ("WAIT_FOR_CALLBACK".equals(stepType)) {
                 String correlationId = createWaitState(
                         runId, workflowId, workflowVersionId, stepIndex, stepDef.getConfig()
@@ -293,7 +284,6 @@ public class WorkflowExecutor {
             // Save result
             if (result.getStatus() == StepExecutionResult.Status.SUCCESS) {
                 stepService.succeedStep(step, result.getOutput(), result.getOutput());
-                // Update context with output
                 context.setStepOutput(stepIndex, result.getOutput());
             } else {
                 stepService.failStep(step, result.getError());
@@ -311,9 +301,7 @@ public class WorkflowExecutor {
     }
 
     /**
-     * Check stage results: if any step failed, stage is FAILED.
-     * If any step is WAITING, return WAITING.
-     * Otherwise, all SUCCEEDED.
+     * Check stage results: WAITING if any step is waiting, else COMPLETED.
      */
     private ExecutionOutcome checkStageResults(UUID runId, List<Integer> stageStepIndices) {
         List<WorkflowRunStep> stageSteps = stepService.getStepsForRun(runId).stream()
@@ -325,13 +313,6 @@ public class WorkflowExecutor {
 
         if (anyWaiting) {
             return ExecutionOutcome.WAITING;
-        }
-
-        boolean anyFailed = stageSteps.stream()
-                .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.FAILED);
-
-        if (anyFailed) {
-            return ExecutionOutcome.COMPLETED;  // Will be caught as FAILED upstream
         }
 
         return ExecutionOutcome.COMPLETED;
