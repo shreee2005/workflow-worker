@@ -1,0 +1,140 @@
+#35 43.64 [INFO] Downloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.jar
+#35 43.68 [INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-manager/2.15.0/plexus-compiler-manager-2.15.0.jar (5.2 kB at 27 kB/s)
+#35 43.68 [INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-api/2.15.0/plexus-compiler-api-2.15.0.jar (29 kB at 146 kB/s)
+#35 43.68 [INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-compiler-javac/2.15.0/plexus-compiler-javac-2.15.0.jar (26 kB at 129 kB/s)
+#35 43.69 [INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.jar (94 kB at 456 kB/s)
+#35 43.92 [INFO] Downloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.jar (193 kB at 435 kB/s)
+#35 44.03 [INFO] Recompiling the module because of changed dependency.
+#35 44.05 [INFO] Compiling 43 source files with javac [debug parameters release 17] to target/classes
+#35 47.01 [INFO] /app/src/main/java/com/workflow_worker/demo/config/OpenTelemetryConfig.java: /app/src/main/java/com/workflow_worker/demo/config/OpenTelemetryConfig.java uses or overrides a deprecated API.
+#35 47.01 [INFO] /app/src/main/java/com/workflow_worker/demo/config/OpenTelemetryConfig.java: Recompile with -Xlint:deprecation for details.
+#35 47.01 [INFO] -------------------------------------------------------------
+#35 47.01 [ERROR] COMPILATION ERROR : 
+#35 47.01 [INFO] -------------------------------------------------------------
+#35 47.01 [ERROR] /app/src/main/java/com/workflow_worker/demo/engine/WorkflowExecutor.java:[65,40] cannot find symbol
+#35 47.01   symbol:   method getNextPendingStepIndex(java.util.UUID)
+#35 47.01   location: variable stepService of type com.workflow_worker.demo.service.WorkflowRunStepService
+#35 47.01 [INFO] 1 error
+#35 47.01 [INFO] -------------------------------------------------------------
+#35 47.01 [INFO] ------------------------------------------------------------------------
+#35 47.01 [INFO] BUILD FAILURE
+#35 47.01 [INFO] ------------------------------------------------------------------------
+#35 47.01 [INFO] Total time:  44.462 s
+#35 47.01 [INFO] Finished at: 2026-07-12T07:05:10Z
+#35 47.01 [INFO] ------------------------------------------------------------------------
+#35 47.01 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project demo: Compilation failure
+#35 47.01 [ERROR] /app/src/main/java/com/workflow_worker/demo/engine/WorkflowExecutor.java:[65,40] cannot find symbol
+#35 47.01 [ERROR]   symbol:   method getNextPendingStepIndex(java.util.UUID)
+#35 47.01 [ERROR]   location: variable stepService of type com.workflow_worker.demo.service.WorkflowRunStepService
+#35 47.01 [ERROR] -> [Help 1]
+#35 47.01 org.apache.maven.lifecycle.LifecycleExecutionException: Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project demo: Compilation failure
+#35 47.01 /app/src/main/java/com/workflow_worker/demo/engine/WorkflowExecutor.java:[65,40] cannot find symbol
+#35 47.01   symbol:   method getNextPendingStepIndex(java.util.UUID)
+#35 47.01   location: variable stepService of type com.workflow_worker.demo.service.WorkflowRunStepService
+#35 47.01 
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute2 (MojoExecutor.java:347)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:330)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:213)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:175)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.access$000 (MojoExecutor.java:76)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor$1.run (MojoExecutor.java:163)
+#35 47.01     at org.apache.maven.plugin.DefaultMojosExecutionStrategy.execute (DefaultMojosExecutionStrategy.java:39)
+#35 47.01     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:160)
+#35 47.01     at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:105)
+#35 47.01     at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:73)
+#35 47.01     at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:53)
+#35 47.01     at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:118)
+#35 47.01     at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:260)
+#35 47.01     at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:172)
+#35 47.01     at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:100)
+#35 47.01     at org.apache.maven.cli.MavenCli.execute (MavenCli.java:821)
+#35 47.01     at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:270)
+#35 47.01     at org.apache.maven.cli.MavenCli.main (MavenCli.java:192)
+#35 47.01     at jdk.internal.reflect.NativeMethodAccessorImpl.invoke0 (Native Method)
+#35 47.01     at jdk.internal.reflect.NativeMethodAccessorImpl.invoke (NativeMethodAccessorImpl.java:77)
+#35 47.01     at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke (DelegatingMethodAccessorImpl.java:43)
+#35 47.01     at java.lang.reflect.Method.invoke (Method.java:568)
+#35 47.01     at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+#35 47.01     at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+#35 47.01     at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+#35 47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+#35 47.02 Caused by: org.apache.maven.plugin.compiler.CompilationFailureException: Compilation failure
+#35 47.02 /app/src/main/java/com/workflow_worker/demo/engine/WorkflowExecutor.java:[65,40] cannot find symbol
+#35 47.02   symbol:   method getNextPendingStepIndex(java.util.UUID)
+#35 47.02   location: variable stepService of type com.workflow_worker.demo.service.WorkflowRunStepService
+#35 47.02 
+#35 47.02     at org.apache.maven.plugin.compiler.AbstractCompilerMojo.executeReal (AbstractCompilerMojo.java:1318)
+#35 47.02     at org.apache.maven.plugin.compiler.AbstractCompilerMojo.execute (AbstractCompilerMojo.java:708)
+#35 47.02     at org.apache.maven.plugin.compiler.CompilerMojo.execute (CompilerMojo.java:235)
+#35 47.02     at org.apache.maven.plugin.DefaultBuildPluginManager.executeMojo (DefaultBuildPluginManager.java:126)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute2 (MojoExecutor.java:342)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.doExecute (MojoExecutor.java:330)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:213)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:175)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.access$000 (MojoExecutor.java:76)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor$1.run (MojoExecutor.java:163)
+#35 47.02     at org.apache.maven.plugin.DefaultMojosExecutionStrategy.execute (DefaultMojosExecutionStrategy.java:39)
+#35 47.02     at org.apache.maven.lifecycle.internal.MojoExecutor.execute (MojoExecutor.java:160)
+#35 47.02     at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:105)
+#35 47.02     at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject (LifecycleModuleBuilder.java:73)
+#35 47.02     at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build (SingleThreadedBuilder.java:53)
+#35 47.02     at org.apache.maven.lifecycle.internal.LifecycleStarter.execute (LifecycleStarter.java:118)
+#35 47.02     at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:260)
+#35 47.02     at org.apache.maven.DefaultMaven.doExecute (DefaultMaven.java:172)
+#35 47.02     at org.apache.maven.DefaultMaven.execute (DefaultMaven.java:100)
+#35 47.02     at org.apache.maven.cli.MavenCli.execute (MavenCli.java:821)
+#35 47.02     at org.apache.maven.cli.MavenCli.doMain (MavenCli.java:270)
+#35 47.02     at org.apache.maven.cli.MavenCli.main (MavenCli.java:192)
+#35 47.02     at jdk.internal.reflect.NativeMethodAccessorImpl.invoke0 (Native Method)
+#35 47.02     at jdk.internal.reflect.NativeMethodAccessorImpl.invoke (NativeMethodAccessorImpl.java:77)
+#35 47.02     at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke (DelegatingMethodAccessorImpl.java:43)
+#35 47.02     at java.lang.reflect.Method.invoke (Method.java:568)
+#35 47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+#35 47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+#35 47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+#35 47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+#35 47.02 [ERROR] 
+#35 47.02 [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+#35 47.02 [ERROR] 
+#35 47.02 [ERROR] For more information about the errors and possible solutions, please read the following articles:
+#35 47.02 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+#35 ERROR: process "/bin/sh -c mvn -B -e -DskipTests package" did not complete successfully: exit code: 1
+
+#34 [workflow-api build 6/6] RUN mvn -B -e -DskipTests package
+#34 CANCELED
+------
+ > [workflow-worker build 6/6] RUN mvn -B -e -DskipTests package:
+47.02     at java.lang.reflect.Method.invoke (Method.java:568)
+47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced (Launcher.java:282)
+47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.launch (Launcher.java:225)
+47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode (Launcher.java:406)
+47.02     at org.codehaus.plexus.classworlds.launcher.Launcher.main (Launcher.java:347)
+47.02 [ERROR] 
+47.02 [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+47.02 [ERROR] 
+47.02 [ERROR] For more information about the errors and possible solutions, please read the following articles:
+47.02 [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+------
+Dockerfile:7
+
+--------------------
+
+   5 |     COPY .mvn .mvn
+
+   6 |     COPY src src
+
+   7 | >>> RUN mvn -B -e -DskipTests package
+
+   8 |     
+
+   9 |     # runtime stage
+
+--------------------
+
+target workflow-worker: failed to solve: process "/bin/sh -c mvn -B -e -DskipTests package" did not complete successfully: exit code: 1
+
+
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/ijzctrhhp6azr6vy8p8pgu4lg
+
+PS C:\dev\dev-infra> 
