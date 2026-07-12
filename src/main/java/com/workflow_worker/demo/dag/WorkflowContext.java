@@ -99,4 +99,41 @@ public class WorkflowContext {
         stepOutputs.clear();
         variables.clear();
     }
+
+    public Map<Integer, String> getStepOutputs() {
+        return stepOutputs;
+    }
+
+    public Map<String, Object> getVariables() {
+        return variables;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static WorkflowContext deserialize(UUID runId, String json) {
+        WorkflowContext context = new WorkflowContext(runId);
+        if (json == null || json.isBlank()) {
+            return context;
+        }
+        try {
+            Map<String, Object> map = mapper.readValue(json, Map.class);
+            if (map.containsKey("stepOutputs")) {
+                Map<?, ?> outputs = (Map<?, ?>) map.get("stepOutputs");
+                for (Map.Entry<?, ?> entry : outputs.entrySet()) {
+                    int key = Integer.parseInt(entry.getKey().toString());
+                    String val = (String) entry.getValue();
+                    context.setStepOutput(key, val);
+                }
+            }
+            if (map.containsKey("variables")) {
+                Map<?, ?> vars = (Map<?, ?>) map.get("variables");
+                for (Map.Entry<?, ?> entry : vars.entrySet()) {
+                    String key = (String) entry.getKey();
+                    context.setVariable(key, entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to deserialize WorkflowContext: " + e.getMessage(), e);
+        }
+        return context;
+    }
 }

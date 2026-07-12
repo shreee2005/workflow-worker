@@ -87,6 +87,17 @@ public class WorkflowRunStepService {
         repo.flush();
     }
 
+    @Transactional
+    public void resetRunningAndFailedStepsForRecovery(UUID runId) {
+        List<WorkflowRunStep> steps = repo.findByRunId(runId);
+        for (WorkflowRunStep step : steps) {
+            if (step.getStatus() == WorkflowRunStep.Status.RUNNING || step.getStatus() == WorkflowRunStep.Status.FAILED) {
+                repo.delete(step);
+            }
+        }
+        repo.flush();
+    }
+
     public WorkflowContext buildContextFromSteps(UUID runId) {
         WorkflowContext context = new WorkflowContext(runId);
 

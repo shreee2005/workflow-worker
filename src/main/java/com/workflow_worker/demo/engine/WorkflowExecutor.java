@@ -28,6 +28,7 @@ public class WorkflowExecutor {
     private final WorkflowWaitStateRepository workflowWaitStateRepository;
     private final WorkflowRunStepService stepService;
     private final StepDispatcher dispatcher;
+    private final CheckpointManager checkpointManager;
 
     // Timeout for parallel step execution (in milliseconds)
     private static final long STAGE_EXECUTION_TIMEOUT_MS = 300000; // 5 minutes
@@ -37,12 +38,14 @@ public class WorkflowExecutor {
             WorkflowWaitStateRepository workflowWaitStateRepository,
             WorkflowRunStepService stepService,
             StepDispatcher dispatcher,
-            WorkflowRunService workflowRunService
+            WorkflowRunService workflowRunService,
+            CheckpointManager checkpointManager
     ) {
         this.workflowVersionRepository = workflowVersionRepository;
         this.workflowWaitStateRepository = workflowWaitStateRepository;
         this.stepService = stepService;
         this.dispatcher = dispatcher;
+        this.checkpointManager = checkpointManager;
     }
 
     @WithSpan("workflow.execute")
@@ -70,8 +73,18 @@ public class WorkflowExecutor {
             ExecutionPlan executionPlan = DagParser.parse(steps);
             currentSpan.setAttribute("workflow.stages", executionPlan.getStageCount());
 
-            // Build context from previously completed steps
-            WorkflowContext context = stepService.buildContextFromSteps(runId);
+            // Load from checkpoint if exists, otherwise fallback to rebuilding from DB steps
+            WorkflowContext context = checkpointManager.loadCheckpoint(runId)
+                    .orElseGet(() -> stepService.buildContextFromSteps(runId));
+
+            // Merge any additional succeeded steps from the DB
+            // that might not have been captured in the last written checkpoint context
+            WorkflowContext dbContext = stepService.buildContextFromSteps(runId);
+            for (int stepIdx : dbContext.getCompletedStepIndices()) {
+                if (!context.isStepCompleted(stepIdx)) {
+                    context.setStepOutput(stepIdx, dbContext.getStepOutput(stepIdx));
+                }
+            }
 
             // Execute stages
             ExecutionOutcome outcome = executeStages(
@@ -117,7 +130,7 @@ public class WorkflowExecutor {
         List<ExecutionStage> stages = executionPlan.getStages();
 
         // Find first incomplete stage
-        int startStageIndex = findFirstIncompleteStage(runId, executionPlan);
+        int startStageIndex = findFirstIncompleteStage(runId, executionPlan, context);
 
         if (startStageIndex == -1) {
             // All stages completed
@@ -145,6 +158,10 @@ public class WorkflowExecutor {
                 }
 
                 span.setAttribute("stage.status", "completed");
+
+                // Save checkpoint after stage completion (satisfies "after successful parallel stage" and "Save state after each major step")
+                int lastStepIndex = stage.getStepIndices().get(stage.getStepIndices().size() - 1);
+                checkpointManager.saveCheckpoint(runId, lastStepIndex, context);
             } catch (Exception ex) {
                 span.recordException(ex);
                 span.setAttribute("stage.status", "failed");
@@ -160,17 +177,17 @@ public class WorkflowExecutor {
      * Find the first stage that hasn't been completed yet.
      * A stage is complete if all its steps are in SUCCEEDED, FAILED, or WAITING status.
      */
-    private int findFirstIncompleteStage(UUID runId, ExecutionPlan executionPlan) {
+    private int findFirstIncompleteStage(UUID runId, ExecutionPlan executionPlan, WorkflowContext context) {
         List<ExecutionStage> stages = executionPlan.getStages();
         List<WorkflowRunStep> existingSteps = stepService.getStepsForRun(runId);
 
         for (ExecutionStage stage : stages) {
             boolean stageComplete = stage.getStepIndices().stream()
-                    .allMatch(stepIndex -> existingSteps.stream()
+                    .allMatch(stepIndex -> context.isStepCompleted(stepIndex) || existingSteps.stream()
                             .filter(s -> s.getStepIndex() == stepIndex)
                             .anyMatch(s -> s.getStatus() == WorkflowRunStep.Status.SUCCEEDED
-                                    || s.getStatus() == WorkflowRunStep.Status.FAILED
-                                    || s.getStatus() == WorkflowRunStep.Status.WAITING)
+                                     || s.getStatus() == WorkflowRunStep.Status.FAILED
+                                     || s.getStatus() == WorkflowRunStep.Status.WAITING)
                     );
 
             if (!stageComplete) {
@@ -255,6 +272,11 @@ public class WorkflowExecutor {
         try {
             StepDefinition stepDef = steps.get(stepIndex);
             String stepType = normalize(stepDef.getType());
+
+            // Save checkpoint BEFORE long-running step execution
+            if (isLongRunningStep(stepType)) {
+                checkpointManager.saveCheckpoint(runId, stepIndex, context);
+            }
 
             // Handle WAIT_FOR_CALLBACK before creating a step record
             if ("WAIT_FOR_CALLBACK".equals(stepType)) {
@@ -354,5 +376,13 @@ public class WorkflowExecutor {
 
     private String normalize(String s) {
         return s == null ? "" : s.trim().toUpperCase();
+    }
+
+    private boolean isLongRunningStep(String stepType) {
+        if (stepType == null) return false;
+        String t = stepType.trim().toUpperCase();
+        return "HTTP_CALL".equals(t) || "WAIT_FOR_CALLBACK".equals(t)
+                || "HTTP".equals(t) || "SLACK".equals(t)
+                || "DATABASE".equals(t) || "S3".equals(t);
     }
 }

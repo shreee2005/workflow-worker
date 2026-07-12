@@ -69,14 +69,17 @@ public class WorkflowTaskConsumer {
             }
 
             boolean isRetryMessage = message.getAttempt() > 0;
+            boolean isRecovery = run.getStatus() == WorkflowRun.Status.RUNNING;
 
             if (run.getStatus() == WorkflowRun.Status.QUEUED ||
                     run.getStatus() == WorkflowRun.Status.RETRYING ||
                     run.getStatus() == WorkflowRun.Status.WAITING ||
-                    (run.getStatus() == WorkflowRun.Status.RUNNING && isRetryMessage)) {
+                    run.getStatus() == WorkflowRun.Status.RUNNING) {
 
                 if (run.getStatus() == WorkflowRun.Status.RETRYING || isRetryMessage) {
                     stepService.resetFailedStepsForRetry(runId);
+                } else if (isRecovery) {
+                    stepService.resetRunningAndFailedStepsForRecovery(runId);
                 }
 
                 if (run.getStatus() != WorkflowRun.Status.RUNNING) {

@@ -1,0 +1,50 @@
+# Workflow Engine Progress – Checkpointing & Crash Recovery
+
+## 1. What We Added and Why
+
+### WorkflowState Entity & Repository
+- Added a new JPA Entity representing the persistent database table `workflow_states`.
+- The table stores:
+  - `runId` (Primary Key)
+  - `currentStep`
+  - `executionContext` (JSON string)
+  - `checkpointId`
+
+**Why**
+- Maintains a persistent snapshot of workflow execution.
+- Stores the last successfully completed step and workflow variables.
+- Allows the worker to resume execution from the last checkpoint after a crash instead of restarting the workflow.
+
+---
+
+### V004__create_workflow_state_table.sql Migration
+- Added a Flyway migration to create the `workflow_states` table.
+
+**Why**
+- Keeps database schema changes version-controlled.
+- Ensures consistent schema updates across all environments.
+- Stays synchronized with the API project's migration system.
+
+---
+
+### CheckpointManager
+- Implemented a dedicated service responsible for:
+  - Serializing `WorkflowContext` into JSON.
+  - Saving checkpoints into the `workflow_states` table.
+  - Loading checkpoints.
+  - Reconstructing `WorkflowContext` during recovery.
+
+**Why**
+- Centralizes checkpoint persistence logic.
+- Separates execution logic from database operations.
+- Makes the workflow engine easier to maintain and extend.
+
+---
+
+## 2. What We Changed and Why
+
+### WorkflowContext Serialization
+- Added getter methods required by Jackson.
+- Added:
+  ```java
+  static WorkflowContext deserialize(UUID runId, String json)
