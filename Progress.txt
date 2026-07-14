@@ -1,5 +1,4 @@
 # Workflow Engine Progress – Checkpointing & Crash Recovery
-
 ## 1. What We Added and Why
 
 ### WorkflowState Entity & Repository
@@ -48,3 +47,17 @@
 - Added:
   ```java
   static WorkflowContext deserialize(UUID runId, String json)
+
+  Next phase uses :->
+  1. Adding new features becomes super easy
+  Before: If you wanted to add a new step (like sending a Slack message or running a DB query), you had to write the executor class, open the engine's core code, and manually add it to a hardcoded list.
+  Now: You just write a single Java file, put @PluginExecutor at the top, and the system automatically detects and loads it on startup. You never have to touch the core engine code again.
+  2. The system checks itself before running (Validation)
+  If a user configures an HTTP step but forgets to supply a URL, the engine would normally start running, connect, and fail mid-execution (wasting resources).
+  Now: Every plugin has a validate check. The engine validates the configuration before launching the step. If something is missing, it stops immediately.
+  3. No memory or connection leaks (Cleanup)
+  Plugins often open external connections (like logging into a database or opening a file stream). If a step crashes, those connections could stay open, slowly eating up your server's memory.
+  Now: The engine guarantees that the cleanup hook is always called, closing database connections and releasing memory even if a step fails.
+  4. Dynamic Frontend (UI)
+  Because each plugin declares its own inputs/outputs (its "schema"), the API can tell the UI: "Here is a list of all plugins, and here are the inputs they expect."
+  This means: If you write a new plugin on the backend, the UI will automatically show a configuration form for it without you writing a single line of React/frontend code!
