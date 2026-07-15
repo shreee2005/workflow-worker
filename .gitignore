@@ -50,11 +50,14 @@ gradle/
 .env.*.local
 application-*.properties
 application-*.yml
-
+src/main/resources/application.properties
 # OS
 .DS_Store
 Thumbs.db
 
+docker/docker-compose.yml
+docker/prometheus.yml
+src/main/resources/db/migration/V005__add_indexes.sql
 # Logs
 *.log
 logs/
