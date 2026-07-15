@@ -5,7 +5,9 @@ import com.workflow_worker.demo.engine.StepExecutionResult;
 import com.workflow_worker.demo.executers.DatabaseExecutor;
 import com.workflow_worker.demo.executers.HttpExecutor;
 import com.workflow_worker.demo.executers.SlackNotifier;
+import com.workflow_worker.demo.executers.EmailExecutor;
 import com.workflow_worker.demo.executers.StepExecutorRegistry;
+import org.springframework.mail.javamail.JavaMailSender;
 import com.workflow_worker.demo.worker.PluginExecutor;
 import com.workflow_worker.demo.worker.WorkflowPlugin;
 import com.workflow_worker.demo.workflow.StepDefinition;
@@ -165,5 +167,40 @@ class PluginLifecycleTest {
         config.put("sql", "SELECT 1");
         StepDefinition validStep = new StepDefinition("DATABASE_QUERY", config);
         assertDoesNotThrow(() -> executor.validate(validStep));
+    }
+
+    @Test
+    void testEmailPluginValidation() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        EmailExecutor executor = new EmailExecutor(mailSender);
+
+        // Missing fields
+        StepDefinition invalidStep = new StepDefinition("EMAIL_SEND", Collections.emptyMap());
+        assertThrows(IllegalArgumentException.class, () -> executor.validate(invalidStep));
+
+        // Valid
+        Map<String, Object> config = new HashMap<>();
+        config.put("to", "recipient@example.com");
+        config.put("subject", "Test Subject");
+        config.put("body", "Test Body");
+        StepDefinition validStep = new StepDefinition("EMAIL_SEND", config);
+        assertDoesNotThrow(() -> executor.validate(validStep));
+    }
+
+    @Test
+    void testEmailPluginExecution() throws Exception {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        EmailExecutor executor = new EmailExecutor(mailSender);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("to", "recipient@example.com");
+        config.put("subject", "Test Subject");
+        config.put("body", "Test Body");
+        StepDefinition step = new StepDefinition("EMAIL_SEND", config);
+
+        String result = executor.execute(step, "payload");
+
+        assertTrue(result.contains("\"status\": \"SENT\""));
+        verify(mailSender, times(1)).send(any(org.springframework.mail.SimpleMailMessage.class));
     }
 }
