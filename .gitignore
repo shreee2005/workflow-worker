@@ -6,7 +6,7 @@ target/
 /build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-
+docker
 # Maven
 .mvn/wrapper/maven-wrapper.jar
 mvnw.cmd
