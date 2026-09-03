@@ -64,7 +64,6 @@ public class RetryService {
             workflowRunRepository.save(run);
             workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
             workflowRunRepository.markDeadLettered(runId);
-            metrics.runsFailed.increment();
             metrics.runsDeadLettered.increment();
 
             WorkflowDlqMessage dlqMsg = new WorkflowDlqMessage();
@@ -113,7 +112,6 @@ public class RetryService {
 
         workflowRunService.transition(runId, WorkflowRun.Status.FAILED);
         workflowRunRepository.markDeadLettered(runId);
-        metrics.runsFailed.increment();
         metrics.runsDeadLettered.increment();
 
         WorkflowDlqMessage dlqMsg = new WorkflowDlqMessage();
