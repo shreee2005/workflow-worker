@@ -9,6 +9,7 @@ import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.service.WorkflowRunService;
 import com.workflow_worker.demo.service.WorkflowRunStepService;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -109,6 +110,8 @@ public class WorkflowTaskConsumer {
 
         } catch (Exception ex) {
             currentSpan.recordException(ex);
+            currentSpan.setStatus(StatusCode.ERROR, "workflow_processing_failed");
+            currentSpan.setAttribute("error.category", errorCategory(ex));
             WorkflowRun latest = workflowRunService.getRun(runId);
 
             if (latest.getStatus() == WorkflowRun.Status.WAITING) return;
@@ -117,6 +120,28 @@ public class WorkflowTaskConsumer {
         } finally {
             distributedLockService.release(runId);
         }
+    }
+
+    private String errorCategory(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return "unknown";
+        }
+        String normalized = message.toLowerCase();
+        if (normalized.contains("timeout") || normalized.contains("connection")
+                || normalized.contains("refused") || normalized.contains("i/o error")) {
+            return "transient_transport";
+        }
+        if (normalized.matches(".*\\b4\\d{2}\\b.*")) {
+            return "downstream_client_error";
+        }
+        if (normalized.matches(".*\\b5\\d{2}\\b.*")) {
+            return "downstream_server_error";
+        }
+        if (normalized.contains("invalid") || normalized.contains("missing")) {
+            return "validation";
+        }
+        return "processing";
     }
 
     private boolean isRetryableError(String msg) {

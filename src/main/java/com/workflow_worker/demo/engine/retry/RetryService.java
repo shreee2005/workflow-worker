@@ -6,6 +6,10 @@ import com.workflow_worker.demo.messaging.WorkflowJobMessage;
 import com.workflow_worker.demo.repository.WorkflowRunRepository;
 import com.workflow_worker.demo.service.WorkflowRunService;
 import com.workflow_worker.demo.worker.WorkflowMetrics;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -32,16 +36,24 @@ public class RetryService {
         this.metrics = metrics;
     }
 
+    @WithSpan("workflow.retry")
     public void handleFailure(
-            UUID runId,
-            UUID workflowId,
-            UUID workflowVersionId,
+            @SpanAttribute("run.id") UUID runId,
+            @SpanAttribute("workflow.id") UUID workflowId,
+            @SpanAttribute("workflow.version.id") UUID workflowVersionId,
             Object payload,
             Exception ex,
             boolean retryable
     ) {
+        Span.current().setAttribute("retry.scheduled", retryable);
+        Span.current().setAttribute("error.category", retryable ? "transient_or_server" : "non_retryable");
+        if (!retryable) {
+            Span.current().recordException(ex);
+            Span.current().setStatus(StatusCode.ERROR, "workflow_dead_lettered");
+        }
 
         WorkflowRun run = workflowRunService.getRun(runId);
+        Span.current().setAttribute("retry.attempt", run.getAttempt());
         UUID effectiveVersionId = workflowVersionId != null ? workflowVersionId : run.getWorkflowVersionId();
 
         if (run.getStatus() == WorkflowRun.Status.WAITING) return;
@@ -78,6 +90,7 @@ public class RetryService {
             }
 
             int attempt = updatedRun.getAttempt();
+            Span.current().setAttribute("retry.attempt", attempt);
 
             WorkflowJobMessage retryMsg = new WorkflowJobMessage();
             retryMsg.setRunId(runId);

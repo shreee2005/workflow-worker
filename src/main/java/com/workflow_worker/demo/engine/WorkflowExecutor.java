@@ -11,6 +11,9 @@ import com.workflow_worker.demo.service.WorkflowRunStepService;
 import com.workflow_worker.demo.workflow.StepDefinition;
 import com.workflow_worker.demo.workflow.WorkflowSpecParser;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import org.springframework.stereotype.Component;
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
 
 @Component
 public class WorkflowExecutor {
+    private static final Tracer TRACER =
+            io.opentelemetry.api.GlobalOpenTelemetry.getTracer("workflow-worker");
 
     private final WorkflowVersionRepository workflowVersionRepository;
     private final WorkflowWaitStateRepository workflowWaitStateRepository;
@@ -97,6 +102,8 @@ public class WorkflowExecutor {
 
         } catch (Exception ex) {
             currentSpan.recordException(ex);
+            currentSpan.setStatus(StatusCode.ERROR, "workflow_execution_failed");
+            currentSpan.setAttribute("error.category", "workflow_execution");
             throw new RuntimeException(ex);
         }
     }
@@ -269,9 +276,37 @@ public class WorkflowExecutor {
             WorkflowContext context,
             String payload
     ) {
+        Span stepSpan = TRACER.spanBuilder("workflow.step").startSpan();
+        stepSpan.setAttribute("run.id", runId.toString());
+        stepSpan.setAttribute("workflow.id", workflowId.toString());
+        if (workflowVersionId != null) {
+            stepSpan.setAttribute("workflow.version.id", workflowVersionId.toString());
+        }
+        stepSpan.setAttribute("step.index", stepIndex);
+
+        try (Scope ignored = stepSpan.makeCurrent()) {
+            return executeStepWithSpan(
+                    runId, workflowId, workflowVersionId, stepIndex, steps, context, payload, stepSpan
+            );
+        } finally {
+            stepSpan.end();
+        }
+    }
+
+    private StepExecutionResult executeStepWithSpan(
+            UUID runId,
+            UUID workflowId,
+            UUID workflowVersionId,
+            int stepIndex,
+            List<StepDefinition> steps,
+            WorkflowContext context,
+            String payload,
+            Span stepSpan
+    ) {
         try {
             StepDefinition stepDef = steps.get(stepIndex);
             String stepType = normalize(stepDef.getType());
+            stepSpan.setAttribute("step.type", stepType);
 
             // Save checkpoint BEFORE long-running step execution
             if (isLongRunningStep(stepType)) {
@@ -314,6 +349,9 @@ public class WorkflowExecutor {
             return result;
 
         } catch (Exception ex) {
+            stepSpan.recordException(ex);
+            stepSpan.setStatus(StatusCode.ERROR, "workflow_step_failed");
+            stepSpan.setAttribute("error.category", "step_execution");
             WorkflowRunStep existingStep = stepService.getStepByRunAndIndex(runId, stepIndex);
             if (existingStep != null && existingStep.getStatus() != WorkflowRunStep.Status.FAILED) {
                 stepService.failStep(existingStep, ex.getMessage());

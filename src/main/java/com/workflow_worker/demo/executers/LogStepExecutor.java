@@ -32,13 +32,10 @@ public class LogStepExecutor implements StepExecutor {
         }
 
         Span currentSpan = Span.current();
-        currentSpan.setAttribute("log.message", message);
+        currentSpan.setAttribute("step.type", "LOG");
+        currentSpan.setAttribute("workflow.outcome", "log_step");
 
-        String logOutput =
-                "[LOG STEP] message=" + message +
-                        " payload=" + payload;
-
-        System.out.println(logOutput);
+        String logOutput = "[LOG STEP] message emitted";
 
         /*
         Used for retry testing.

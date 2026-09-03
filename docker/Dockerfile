@@ -11,4 +11,4 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 COPY docker/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "/app/app.jar"]
